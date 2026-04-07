@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="de" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>ADITO Migrator v1.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+
+<script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"></script>
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
+
+#sidebar { width: 380px; min-width: 250px; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--bs-border-color); background: var(--bs-dark-bg-subtle); }
+#tree-container { flex: 1; overflow-y: auto; padding-bottom: 20px; }
+
+.tree-row { display: flex; align-items: center; padding: 6px 8px; cursor: pointer; border-bottom: 1px solid var(--bs-border-color-translucent); gap: 8px; transition: background 0.1s; }
+.tree-row:hover { background: var(--bs-secondary-bg); }
+.tree-row.active { background: rgba(13, 110, 253, 0.15); box-shadow: inset 3px 0 0 var(--bs-primary); font-weight: 600; }
+.tree-row > span:nth-child(4) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+
+.status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 3px rgba(0,0,0,0.5); }
+.icon-col { width: 16px; text-align: center; opacity: 0.8; }
+
+.collapsed + .tree-sub { display: none; }
+.toggle-icon { width: 20px; text-align: center; font-size: 13px; transition: transform 0.2s; color: var(--bs-secondary-color); padding: 4px; border-radius: 4px; }
+.toggle-icon:hover { background: rgba(255,255,255,0.1); color: white; }
+.collapsed .toggle-icon { transform: rotate(-90deg); }
+
+#content-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
+.diff-wrapper { display: flex; flex: 1; overflow: hidden; position: relative; background: #0d1117; }
+.diff-pane { flex: 1 1 50%; overflow-y: auto; padding: 15px; min-width: 0; }
+#resizer { width: 6px; cursor: col-resize; background: var(--bs-border-color); z-index: 5; transition: background 0.2s; }
+#resizer:hover { background: var(--bs-primary); }
+
+.code-diff { white-space: pre; font-family: var(--bs-font-monospace); font-size: 14px; line-height: 1.5; }
+
+/* Custom Properties Colors */
+.subtle-diff-border { border-left: 2px solid var(--bs-warning) !important; }
+.subtle-diff-border-custom { border-left: 2px solid #b762d6 !important; }
+.text-custom { color: #d288ec !important; }
+.badge-custom { background-color: #8e44ad; color: white; border: 1px solid #9b59b6; }
+.btn-custom { background-color: #8e44ad; color: white; border-color: #9b59b6; }
+.btn-custom:hover { background-color: #9b59b6; color: white; }
+.btn-outline-custom { color: #d288ec; border-color: #9b59b6; }
+.btn-outline-custom:hover { background-color: #8e44ad; color: white; }
+.row-new-modular { opacity: 0.55; }
+.row-new-modular:hover { opacity: 0.8; }
+.hover-bg-subtle:hover { background-color: rgba(255,255,255,0.05) !important; }
+
+/* Diff2Html Tweaks */
+.d2h-file-wrapper { border: none; margin-bottom: 0; border-radius: 0; }
+.d2h-file-header { display: none; }
+.d2h-code-line { font-family: var(--bs-font-monospace); font-size: 13px; }
+.d2h-code-linenumber { border-color: var(--bs-border-color) !important; }
+.d2h-code-side-linenumber, .d2h-code-linenumber { position: static !important; }
+.d2h-diff-tbody-wrapper { overflow-x: hidden; } 
+</style>
+</head>
+<body>
+
+<header class="d-flex align-items-center gap-2 p-2 border-bottom bg-body-tertiary shadow-sm z-3">
+    <div class="fw-bold fs-6 me-3"><i class="fa-solid fa-bolt text-warning"></i> Adito Migrator v1.0</div>
+    <button id="btn-f1" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('f1').click()">1. Original</button>
+    <button id="btn-f2" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('f2').click()">2. Modular</button>
+   
+    
+    <select id="entitySelect" class="form-select form-select-sm w-auto bg-dark text-light ms-2"><option value="">Ordner laden...</option></select>
+    <button class="btn btn-sm btn-primary" onclick="reloadCurrentEntity()" title="Liest die Ordner und Struktur live neu ein"><i class="fa-solid fa-rotate"></i> Reload Entity</button>
+    <button class="btn btn-sm btn-success ms-1" onclick="buildTree()"><i class="fa-solid fa-sync"></i> Diff laden</button>
+
+    <div class="ms-auto d-flex gap-3 text-secondary small align-items-center">
+        <span title="Eigene Projekt-Anpassung (nicht aus einem Modul)"><span class="badge badge-custom shadow-sm"><i class="fa-solid fa-wrench"></i> CUSTOM</span></span>
+        <span class="border-start border-secondary h-50 mx-1"></span>
+        <span title="Befindet sich nur im neuen Projekt"><div class="status-dot bg-secondary d-inline-block"></div> Modular-Only</span>
+        <span><div class="status-dot bg-danger d-inline-block"></div> Fehlt / Zu Migrieren</span>
+        <span><div class="status-dot bg-warning d-inline-block"></div> Geändert</span>
+        <span><div class="status-dot bg-transparent border border-secondary d-inline-block"></div> Gleich</span>
+    </div>
+
+    <input type="file" id="f1" nwdirectory hidden>
+    <input type="file" id="f2" nwdirectory hidden>
+</header>
+
+<main class="d-flex flex-grow-1 overflow-hidden">
+    <div id="sidebar">
+        <div class="p-2 border-bottom d-flex gap-2 align-items-center bg-body-tertiary">
+            <button class="btn btn-sm btn-secondary" onclick="toggleAll(false)" title="Einklappen"><i class="fa-solid fa-compress"></i></button>
+            <button class="btn btn-sm btn-secondary" onclick="toggleAll(true)" title="Ausklappen"><i class="fa-solid fa-expand"></i></button>
+            <span class="small text-secondary ms-auto" id="file-status">Warte auf Dateien...</span>
+        </div>
+        <div id="tree-container"></div>
+    </div>
+    
+    <div id="content-view">
+        <div class="p-2 border-bottom bg-body-tertiary d-flex align-items-center justify-content-between">
+            <div id="view-title" class="fw-bold text-primary">Bitte ein Element auswählen</div>
+            <button class="btn btn-sm btn-outline-warning d-none" id="debugBtn" onclick="S('debug-panel').classList.toggle('d-none')">
+                <i class="fa-solid fa-bug"></i> Source Info
+            </button>
+        </div>
+        
+        <div id="debug-panel" class="d-none p-2 border-bottom border-warning text-warning small font-monospace shadow-sm" style="background:#221100; word-break: break-all;"></div>
+
+        <div class="diff-wrapper" id="props-view">
+            <div class="diff-pane" id="pane1"></div><div id="resizer"></div><div class="diff-pane" id="pane2"></div>
+        </div>
+
+        <div id="diff-view-container" class="d-none flex-column flex-grow-1 overflow-hidden">
+            <div id="diff-toolbar" class="p-2 border-bottom bg-body-tertiary d-flex justify-content-between align-items-center z-1"></div>
+            <div id="diff-col-headers" class="d-flex w-100 bg-dark border-bottom border-secondary text-secondary small font-monospace shadow-sm z-1" style="font-size: 11px;">
+                <div class="w-50 py-1 px-3 border-end border-secondary">Original</div>
+                <div class="w-50 py-1 px-3" id="diff-right-header">Modular</div>
+            </div>
+            <div id="diff-html-target" class="flex-grow-1 overflow-auto" style="background: #0d1117;"></div>
+        </div>
+    </div>
+</main>
+
+<script>
+// --- NODE.JS INTEGRATION ---
+const fs = typeof require !== 'undefined' ? require('fs') : null;
+const path = typeof require !== 'undefined' ? require('path') : null;
+
+const S = (id) => document.getElementById(id);
+let files1 = new Map(), files2 = new Map(), currentEntity = localStorage.getItem("lastAditoEntity") || "";
+let entitySummaryData = []; 
+let currentS1 = '', currentS2 = '';
+window.activeView = null;
+
+// STATE MANAGER FÜR LIVE RELOAD
+let treeState = { expanded: new Set(), collapsed: new Set(), active: null };
+
+let globalRefIndex = { entityToContext: new Map(), viewToContexts: new Map(), viewUsage: new Map() };
+
+const ADITO_PROCESS_NAMES = new Set([
+    "titleProcess", "linkedContextProcess", "tooltipProcess", "placeholderProcess",
+    "valueProcess", "displayProcess", "displayValueProcess", "onValidation", "onValueChange", "dropDownProcess",
+    "colorProcess", "stateProcess", "mandatoryProcess", "selectionModeProcess",
+    "contentTypeProcess", "expression", "iconProcess", "onInit", "beforeOperatingState",
+    "afterOperatingState", "afterSave", "initFilterProcess", "contentTitleProcess",
+    "contentDescriptionProcess", "grantCreateProcess", "grantUpdateProcess",
+    "grantDeleteProcess", "imageProcess", "iconIdProcess", "uniqueProviderKeyProcess",
+    "targetConsumerProcess", "filterVariablesProcess", "onActionProcess", "process",
+    "filterConditionProcess", "serviceTaskParameterProcess",
+    "fromClauseProcess", "conditionProcess", "orderClauseProcess", "onDBInsert", "onDBUpdate", "onDBDelete",
+    "filterFieldsProcess", "filterValuesProcess", "recordContainerProcess", "contentProcess", "hasTailProcess",
+    "idProcess"
+]);
+
+const IGNORED_STRUCTURAL_NODES = new Set([
+    "entityFields", "recordContainers", "entityProvider", "entityConsumer",
+    "entityParameter", "entityActionField", "filterExtension",
+    "references", "children", "dashletConfigurations", "filterExtensions", "columns", "favoriteAction1",
+    "recordFieldMappings", "linkInformation", "filterExtensionSet", "implementations"
+]);
+
+const semanticOrder = ["name", "title", "titlePlural", "description", "entity", "recordContainer", "entityName", "fieldName", "image", "contentType", "state", "mandatory", "consumer", "filtertype"];
+
+const cats = [
+    { l: 'Entity (Root)', t: 'entity', icon: 'fa-database', color: '#ffffff', isSingle: true },
+    { l: 'Record Containers', t: 'recordContainer', icon: 'fa-server', color: '#d35400' },
+    { l: 'Views (neonView)', t: 'neonView', icon: 'fa-window-maximize', color: '#00cec9' },
+    { l: 'Actions', t: 'entityActionField', icon: 'fa-bolt', color: '#f39c12' },
+    { l: 'Consumers', t: 'entityConsumer', icon: 'fa-link', color: '#27ae60' },
+    { l: 'Fields', t: 'entityField', icon: 'fa-table-columns', color: '#3498db' },
+    { l: 'Filter Extensions', t: 'filterExtension', icon: 'fa-filter', color: '#9b59b6' },
+    { l: 'Parameters', t: 'entityParameter', icon: 'fa-sliders', color: '#f1c40f' },
+    { l: 'Providers', t: 'entityProvider', icon: 'fa-sign-out-alt', color: '#e74c3c' },
+    { l: 'Services', t: 'entityServiceDefinition', icon: 'fa-cogs', color: '#1abc9c' }
+];
+
+const validExtractionNodes = cats.filter(c => !c.isSingle).map(c => c.t);
+validExtractionNodes.push('consumerMapping');
+
+const prettierOpts = { parser: "babel", plugins: typeof prettierPlugins !== 'undefined' ? prettierPlugins : [], semi: true, singleQuote: false, bracketSpacing: true, printWidth: 120 };
+
+function escapeHtml(unsafe) { return unsafe ? unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : ""; }
+function setActive(row) { document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('active')); row.classList.add('active'); }
+function toggleAll(exp) { document.querySelectorAll('.group-header, .tree-row').forEach(r => r.classList.toggle('collapsed', !exp)); }
+function toggleArrowVisibility(rowEl, hasChildren) { const i = rowEl.querySelector('.toggle-icon'); if (i) i.style.visibility = hasChildren ? 'visible' : 'hidden'; }
+
+// --- STATE MANAGER ---
+function saveTreeState() {
+    treeState.expanded.clear();
+    treeState.collapsed.clear();
+    document.querySelectorAll('.tree-row, .group-header').forEach(row => {
+        const id = row.getAttribute('data-node-id');
+        if (!id) return;
+        if (row.classList.contains('collapsed')) treeState.collapsed.add(id);
+        else treeState.expanded.add(id);
+        
+        if (row.classList.contains('active')) treeState.active = id;
+    });
+}
+
+function restoreTreeState() {
+    document.querySelectorAll('.tree-row, .group-header').forEach(row => {
+        const id = row.getAttribute('data-node-id');
+        if (!id) return;
+        if (treeState.expanded.has(id)) row.classList.remove('collapsed');
+        if (treeState.collapsed.has(id)) row.classList.add('collapsed');
+    });
+    
+    if (treeState.active) {
+        const activeRow = document.querySelector(`[data-node-id="${treeState.active}"]`);
+        if (activeRow) {
+            activeRow.click();
+            setTimeout(() => activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' }), 100);
+        }
+    }
+}
+
+// --- NATIVE FILE SYSTEM HELPERS ---
+function walkDirSync(dir, fileList = [], rootDir = dir) {
+    if (!fs) return fileList;
+    try {
+        const files = fs.readdirSync(dir);
+        for (const file of files) {
+            const filePath = path.join(dir, file);
+            const stat = fs.statSync(filePath);
+            if (stat.isDirectory()) {
+                if (file !== 'dist' && file !== 'node_modules_ignored' && file !== '.git') {
+                    walkDirSync(filePath, fileList, rootDir);
+                }
+            } else {
+                fileList.push(filePath);
+            }
+        }
+    } catch (e) {
+        console.error("Berechtigungsfehler beim Lesen von", dir, e);
+    }
+    return fileList;
+}
+
+const loadPathSilent = (rootPath, map) => {
+    if (!fs || !rootPath) return;
+    map.clear();
+    const allFiles = walkDirSync(rootPath);
+    for (let fullPath of allFiles) {
+        const relativePath = fullPath.substring(rootPath.length + 1).replace(/\\/g, '/');
+        // WICHTIG: Kein toLowerCase() beim Key setzen, da Original-Views sonst kaputt gehen
+        map.set(relativePath, { 
+            nativePath: fullPath, 
+            webkitRelativePath: relativePath 
+        });
+    }
+};
+
+const loadPath = async (rootPath, map, num) => {
+    if (!rootPath) return;
+    sessionStorage.setItem("f" + num, rootPath);
+    S('btn-f' + num).innerHTML = `<i class="fa-solid fa-check text-success"></i> ${path ? path.basename(rootPath) : rootPath}`;
+    loadPathSilent(rootPath, map);
+    S('file-status').textContent = `${files1.size + files2.size} Dateien indexiert`;
+};
+
+S('f1').onchange = async e => { await loadPath(e.target.value, files1, 1); await buildGlobalIndex(); };
+S('f2').onchange = async e => { await loadPath(e.target.value, files2, 2); await buildGlobalIndex(); };
+
+// Live Reload
+async function reloadCurrentEntity() {
+    saveTreeState(); 
+    S('tree-container').innerHTML = '<div class="p-4 text-info text-center"><i class="fa-solid fa-bolt fa-spin fa-2x mb-2"></i><br>Lese Ordner live vom Dateisystem...</div>';
+    await new Promise(r => setTimeout(r, 50)); 
+    
+    const root1 = sessionStorage.getItem("f1");
+    const root2 = sessionStorage.getItem("f2");
+    if (root1) loadPathSilent(root1, files1);
+    if (root2) loadPathSilent(root2, files2);
+    
+    await buildGlobalIndex();
+    await buildTree();
+}
+
+async function reloadActiveView() {
+    if (!window.activeView) return;
+    const v = window.activeView;
+    if (v.view === 'diff') {
+        S('diff-html-target').innerHTML = '<div class="p-5 text-info text-center mt-5"><i class="fa-solid fa-bolt fa-spin fa-3x mb-3"></i><br>Lese Datei live von Festplatte...</div>';
+        await new Promise(r => setTimeout(r, 50));
+        v.s1 = await safeReadText(v.file1) || '';
+        v.s2Core = await safeReadText(v.file2Core) || '';
+        v.s2Custom = await safeReadText(v.file2Custom) || '';
+        await renderCurrentView();
+    }
+}
+
+function getFileRef(map, searchPath) { 
+    if(!searchPath) return null;
+    const cleanPath = searchPath.toLowerCase().replace('%aditoprj%/', '');
+    for (const [key, value] of map.entries()) {
+        if (key.toLowerCase().endsWith(cleanPath)) return value;
+    }
+    return null; 
+}
+
+function updateDebugPanel(file1, file2) {
+    S('debugBtn').classList.remove('d-none');
+    const p1 = file1 ? file1.nativePath : 'Nicht gefunden / Root';
+    const p2 = file2 ? file2.nativePath : 'Nicht gefunden / Root';
+    const copyHtml = file2 ? `<button class="btn btn-outline-warning btn-sm py-0 ms-3" style="font-size:10px" onclick="navigator.clipboard.writeText('${p2.replace(/\\/g, '/')}');this.innerHTML='<i class=\\'fa-solid fa-check\\'></i> Kopiert';setTimeout(()=>this.innerHTML='Pfad kopieren',2000)">Pfad kopieren</button>` : '';
+
+    S('debug-panel').innerHTML = `
+        <div class="fw-bold mb-1"><i class="fa-solid fa-code-commit"></i> Native Source Files:</div>
+        <div><span style="color: #ccc; width: 60px; display: inline-block;">Original:</span> <span class="text-white">${p1}</span></div>
+        <div class="d-flex align-items-center mt-1"><span style="color: #ccc; width: 60px; display: inline-block;">Modular:</span>  <span class="text-white">${p2}</span> ${copyHtml}</div>
+    `;
+}
+
+function isPropEqual(v1, v2) {
+    if (v1 === v2) return true;
+    if ((v1 === "" && v2 === "true") || (v1 === "true" && v2 === "")) return true;
+    return false;
+}
+
+async function checkSmartEquality(s1, s2) {
+    if (s1 === s2) return true;
+    if (!s1 || !s2) return false;
+    try {
+        const p1 = await prettier.format(s1, prettierOpts);
+        const p2 = await prettier.format(s2, prettierOpts);
+        return p1 === p2;
+    } catch (e) {
+        return s1.replace(/\s+/g, '') === s2.replace(/\s+/g, '');
+    }
+}
+
+// ═══ Memory Loader & Global Index ═══
+window.onload = async () => {
+    if (!fs) alert("Achtung: Dies ist die NW.js Edition. Führe diese HTML-Datei über NW.js aus, um nativen Dateizugriff zu erhalten.");
+    const f1 = sessionStorage.getItem("f1"), f2 = sessionStorage.getItem("f2");
+    
+    if(f1 && fs && fs.existsSync(f1)) { await loadPath(f1, files1, 1); }
+    if(f2 && fs && fs.existsSync(f2)) { await loadPath(f2, files2, 2); }
+    if(f1 || f2) await buildGlobalIndex();
+};
+
+async function buildGlobalIndex() {
+    S('entitySelect').innerHTML = '<option value="">Indiziere Projekt (Views & Contexte)...</option>';
+    S('entitySelect').disabled = true;
+    await new Promise(r => setTimeout(r, 20));
+
+    globalRefIndex = { entityToContext: new Map(), viewToContexts: new Map(), viewUsage: new Map() };
+    
+    const processContexts = async (map) => {
+        for (let [pathKey, file] of map) {
+            const pathLower = pathKey.toLowerCase();
+            // FIX: Unterstützt nun auch Dateien, die direkt im Root (ohne leading slash) liegen
+            if ((pathLower.includes('/neoncontext/') || pathLower.startsWith('neoncontext/')) && pathLower.endsWith('.aod')) {
+                const txt = await safeReadText(file);
+                if (!txt) continue;
+                const xml = new DOMParser().parseFromString(txt, 'text/xml');
+                const ctxName = xml.getElementsByTagName('name')[0]?.textContent || pathKey.split('/').pop().replace('.aod','');
+                const entName = xml.getElementsByTagName('entity')[0]?.textContent;
+
+                if (entName) {
+                    globalRefIndex.entityToContext.set(entName.toLowerCase(), ctxName);
+                }
+
+                const viewTags = ['view', 'mainView', 'filterView', 'editView', 'previewView', 'previewMultipleView', 'lookupView'];
+                viewTags.forEach(tag => {
+                    xml.querySelectorAll(tag).forEach(n => {
+                        const viewName = n.textContent.trim();
+                        if (!viewName) return;
+                        if (!globalRefIndex.viewToContexts.has(viewName)) {
+                            globalRefIndex.viewToContexts.set(viewName, new Set());
+                        }
+                        globalRefIndex.viewToContexts.get(viewName).add(ctxName);
+                    });
+                });
+            }
+        }
+    };
+    await processContexts(files1); await processContexts(files2);
+
+    S('entitySelect').disabled = false;
+    updateEntityList();
+}
+
+function updateEntityList() {
+    const ents = new Set([...files1.keys(), ...files2.keys()].filter(p => p.toLowerCase().endsWith('_entity.aod')).map(p => p.split('/').pop().replace('.aod','').replace('_entity', '').replace('_Entity', '')));
+    if(ents.size === 0) return;
+    S('entitySelect').innerHTML = '<option value="">Entity wählen...</option>';
+    [...ents].sort().forEach(e => S('entitySelect').add(new Option(e, e, false, e === currentEntity)));
+}
+S('entitySelect').onchange = e => { currentEntity = e.target.value; localStorage.setItem("lastAditoEntity", currentEntity); buildTree(); };
+
+// NATIVE FILE READ
+async function safeReadText(fileRef) {
+    if (!fileRef || !fileRef.nativePath || !fs) return null;
+    try { 
+        return fs.readFileSync(fileRef.nativePath, 'utf-8'); 
+    } catch (e) { 
+        return null; 
+    }
+}
+
+// ═══ View Structure Extractor ═══
+function extractViewChildren(node) {
+    if (!node) return [];
+    const childrenNode = Array.from(node.childNodes).find(n => n.nodeName === 'children');
+    if (!childrenNode) return [];
+
+    return Array.from(childrenNode.childNodes).filter(n => n.nodeType === 1).map(child => {
+        const type = child.nodeName;
+        const getVal = tag => Array.from(child.childNodes).find(n => n.nodeName === tag)?.textContent?.trim() || '';
+        const props = {};
+        Array.from(child.childNodes).forEach(n => {
+            if (n.nodeType !== 1) return;
+            const tag = n.nodeName;
+            if (['name', 'view', 'entityField'].includes(tag)) return;
+
+            const elementChildren = Array.from(n.childNodes).filter(sub => sub.nodeType === 1);
+            if (elementChildren.length > 0) {
+                props[tag] = elementChildren.map(sub => {
+                     const ef = Array.from(sub.childNodes).find(s => s.nodeName === 'entityField');
+                     const nm = Array.from(sub.childNodes).find(s => s.nodeName === 'name');
+                     if (ef && ef.textContent.trim()) return ef.textContent.trim();
+                     if (nm && nm.textContent.trim()) return nm.textContent.trim();
+                     return sub.nodeName;
+                }).filter(Boolean).join(', ');
+            } else {
+                let val = n.textContent.trim();
+                if (val === "") {
+                    if (n.hasAttribute('v')) val = n.getAttribute('v');
+                    else if (n.hasAttribute('value')) val = n.getAttribute('value');
+                    else val = "(leeres Tag / true)";
+                }
+                props[tag] = val;
+            }
+        });
+
+        return {
+            type: type, name: getVal('name'), targetView: getVal('view'), entityField: getVal('entityField'),
+            extPoint: child.getAttribute('data-ext-point'), isCustomInjected: child.getAttribute('data-is-custom') === 'true',
+            id: Math.random().toString(36).substr(2, 9), props: props
+        };
+    });
+}
+
+function buildViewStructureHtml(node, title, panePrefix) {
+    let html = `<div class="mt-4"><h6 class="text-secondary mb-3"><i class="fa-solid fa-sitemap text-info"></i> View Struktur (Children)</h6>`;
+    if (!node) return html + `<div class="text-muted small border border-secondary p-2 rounded">Nicht vorhanden</div></div>`;
+    const children = extractViewChildren(node);
+    if (children.length === 0) return html + `<div class="text-muted small border border-secondary p-2 rounded" style="background: rgba(0,0,0,0.2);">Keine Elemente</div></div>`;
+
+    const rootElements = [];
+    const extMap = new Map();
+    
+    children.forEach(c => {
+        if (c.extPoint) {
+            if (!extMap.has(c.extPoint)) extMap.set(c.extPoint, []);
+            extMap.get(c.extPoint).push(c);
+        } else {
+            rootElements.push(c);
+        }
+    });
+
+    const matchedExts = new Set();
+    html += `<div class="list-group list-group-flush shadow-sm" style="border: 1px solid var(--bs-border-color); border-radius: 4px;">`;
+
+    const renderRow = (c, isChild = false, hasChildren = false) => {
+        let icon = 'fa-cube'; let badge = '';
+        let mainText = escapeHtml(c.name) || c.type; 
+        let subText = `Typ: <b class="text-light">${escapeHtml(c.type)}</b>`;
+
+        if (c.extPoint && isChild) { icon = 'fa-puzzle-piece'; badge += `<span class="badge bg-success ms-2 shadow-sm" style="font-size:9px;">EXT INJECTION</span>`; } 
+        else if (c.extPoint && c.crossInject) { icon = 'fa-puzzle-piece'; badge += `<span class="badge bg-info text-dark ms-2 shadow-sm" style="font-size:9px;">MODULE INJECTION</span>`; subText += ` &rarr; Target: <b class="text-light">${escapeHtml(c.extPoint)}</b>`; }
+        if (c.isCustomInjected) { badge += `<span class="badge badge-custom ms-1 shadow-sm" style="font-size:9px;">CUSTOM</span>`; }
+
+        if (c.type === 'neonViewReference') {
+            if(!c.extPoint) icon = 'fa-link'; 
+            mainText = escapeHtml(c.targetView); badge += `<span class="badge bg-primary ms-1 shadow-sm" style="font-size:9px;">REF</span>`;
+            subText = c.entityField ? `Consumer: <span class="text-light">${escapeHtml(c.entityField)}</span>` : 'Kein Consumer konfiguriert';
+        } else if (c.type.includes('Template')) { if(!c.extPoint) icon = 'fa-layer-group'; badge += `<span class="badge bg-secondary ms-1 shadow-sm" style="font-size:9px;">TMPL</span>`;
+        } else if (c.type.includes('ExtensionPoint')) { icon = 'fa-puzzle-piece'; badge += `<span class="badge bg-secondary text-light ms-1 shadow-sm" style="font-size:9px;">EXT POINT</span>`; }
+
+        const collapseId = `collapse_props_${panePrefix}_${c.id}`;
+        const groupCollapseId = `collapse_group_${panePrefix}_${c.id}`;
+        let propsHtml = '';
+        
+        if (Object.keys(c.props).length > 0) {
+            propsHtml = `<div class="mt-2 d-none" id="${collapseId}"><table class="table table-sm table-bordered border-secondary mb-0" style="font-size: 11px; background: rgba(0,0,0,0.3);"><tbody>`;
+            for (const k of Object.keys(c.props).sort()) {
+                propsHtml += `<tr><td style="width: 30%; color: #999; padding: 4px;">${escapeHtml(k)}</td><td class="font-monospace text-light text-wrap" style="padding: 4px; word-break: break-all;">${escapeHtml(c.props[k])}</td></tr>`;
+            }
+            propsHtml += `</tbody></table></div>`;
+        }
+
+        const indentHtml = isChild ? `<div style="width: 20px; border-left: 2px solid var(--bs-success); margin-left: 10px; margin-top: -1px; margin-bottom: -1px;"></div>` : '';
+        let rowAction = `onclick="const el = document.getElementById('${collapseId}'); if(el) { el.classList.toggle('d-none'); const ic = this.querySelector('.chevron-props'); if(ic) { ic.style.transform = el.classList.contains('d-none') ? 'rotate(0deg)' : 'rotate(180deg)'; } }"`;
+        let caret = Object.keys(c.props).length > 0 ? `<div class="ms-auto align-self-center"><i class="fa-solid fa-chevron-down text-secondary chevron-props" style="font-size: 12px; transition: transform 0.2s;"></i></div>` : '';
+        let caretGroup = '';
+
+        if (hasChildren) {
+            rowAction = `onclick="const el = document.getElementById('${groupCollapseId}'); if(el) { el.classList.toggle('d-none'); const ic = this.querySelector('.chevron-group'); if(ic) { ic.style.transform = el.classList.contains('d-none') ? 'rotate(-90deg)' : 'rotate(0deg)'; } }"`;
+            caretGroup = `<div class="ms-1 me-2 align-self-center"><i class="fa-solid fa-chevron-down text-info chevron-group" style="font-size: 14px; transition: transform 0.2s;"></i></div>`;
+            caret = ''; 
+        }
+
+        const rowHtml = `
+        <div class="d-flex w-100">
+            ${indentHtml}
+            <div class="list-group-item bg-dark border-secondary p-2 d-flex flex-column hover-bg-subtle flex-grow-1" style="border-radius: 0;">
+                <div class="d-flex align-items-center gap-3 w-100" style="cursor:pointer;" ${rowAction}>
+                    ${caretGroup}
+                    <div class="text-info fs-5" style="opacity: 0.8; width: 24px; text-align: center;"><i class="fa-solid ${icon}"></i></div>
+                    <div class="flex-grow-1" style="line-height: 1.3;">
+                        <div class="fw-bold text-light" style="font-size: 13px;">${mainText} ${badge}</div>
+                        <div class="text-secondary" style="font-size: 11px;">${subText}</div>
+                    </div>
+                    ${caret}
+                </div>
+                ${propsHtml}
+            </div>
+        </div>`;
+        return { rowHtml, groupCollapseId };
+    };
+
+    rootElements.forEach(c => {
+        const injectedChildren = extMap.get(c.name) || [];
+        const hasChildren = injectedChildren.length > 0;
+        if (hasChildren) matchedExts.add(c.name);
+        
+        const { rowHtml, groupCollapseId } = renderRow(c, false, hasChildren);
+        html += rowHtml;
+
+        if (hasChildren) {
+            html += `<div id="${groupCollapseId}" class="w-100">`;
+            injectedChildren.forEach(inj => { html += renderRow(inj, true, false).rowHtml; });
+            html += `</div>`;
+        }
+    });
+
+    for (let [eName, injList] of extMap.entries()) {
+        if (!matchedExts.has(eName)) {
+            injList.forEach(inj => { html += renderRow({ ...inj, crossInject: true, extPoint: eName }, false, false).rowHtml; });
+        }
+    }
+
+    html += `</div></div>`;
+    return html;
+}
+
+// ═══ AOD Engine ═══
+async function getEntityData(map, entityBaseName) {
+    const data = { root: null, rootSourceFile: null, contextRoot: null, contextSourceFile: null, elements: new Map(), overrides: new Map(), serviceImpls: new Map() };
+    const baseLower = entityBaseName.toLowerCase();
+    const expectedModelName = baseLower + "_entity";
+    
+    const ctxName = globalRefIndex.entityToContext.get(expectedModelName);
+    const folderRegex = new RegExp(`(^|/)${baseLower}_entity/`, 'i');
+    let expectedViews = new Set();
+    const viewMods = []; 
+    
+    for (let [pathKey, file] of map.entries()) {
+        const pathLower = pathKey.toLowerCase();
+        if (!pathLower.endsWith('.aod')) continue;
+        if (pathLower.includes('aliasdefinition') || pathLower.includes('_alias/')) continue;
+        
+        const isMain = pathLower.endsWith(`/${baseLower}_entity.aod`) || pathLower.endsWith(`/${baseLower}_entity_mod.aod`) || pathLower === `${baseLower}_entity.aod`;
+        const isEntityFolder = folderRegex.test(pathLower);
+        const isMod = pathLower.includes('modification/');
+        
+        // FIX: Auch hier robuster machen
+        const isContext = ctxName && (pathLower.includes('/neoncontext/') || pathLower.startsWith('neoncontext/')) && pathLower.endsWith(`/${ctxName.toLowerCase()}.aod`);
+        
+        if (isMain || isEntityFolder || isMod || isContext) {
+            const text = await safeReadText(file);
+            if (!text) continue;
+            const xml = new DOMParser().parseFromString(text, "text/xml");
+            const rootNode = xml.documentElement;
+            const isCustomMod = !pathLower.includes('node_modules');
+
+            const extractFromNode = (n, ep, sourceFileObj, isCustom, forcedNested = false) => {
+                const isContainer = n.nodeName.endsWith('RecordContainer');
+                const isMapping = n.nodeName.endsWith('RecordFieldMapping') || n.nodeName.endsWith('FieldDbMapping');
+                const isServiceImpl = n.nodeName === 'serviceImplementation';
+                
+                let typeKey = validExtractionNodes.includes(n.nodeName) ? n.nodeName : null;
+                if (isContainer) typeKey = 'recordContainer';
+                if (isMapping) typeKey = 'recordFieldMapping';
+                if (isServiceImpl) typeKey = 'serviceImplementation';
+
+                let parentService = null;
+                if (isServiceImpl) {
+                    let p = n.parentNode;
+                    while(p && p.nodeType === 1) {
+                        if (p.nodeName === 'entityServiceDefinition') { parentService = Array.from(p.childNodes).find(c => c.nodeName === 'name')?.textContent; break; }
+                        p = p.parentNode;
+                    }
+                    if (!parentService && sourceFileObj) {
+                        const pathParts = sourceFileObj.webkitRelativePath.split('/');
+                        const implIdx = pathParts.indexOf('implementations');
+                        if (implIdx > 0) parentService = pathParts[implIdx - 1];
+                    }
+                }
+
+                if (typeKey) {
+                    let isNestedParam = forcedNested;
+                    if (isServiceImpl && parentService) isNestedParam = true; 
+                    
+                    if (!isNestedParam && (typeKey === 'entityParameter' || typeKey === 'consumerMapping' || typeKey === 'recordFieldMapping' || typeKey === 'serviceImplementation')) {
+                        let p = n.parentNode;
+                        while(p && p.nodeType === 1) {
+                            if (p.nodeName === 'entityConsumer' || p.nodeName.endsWith('RecordContainer') || p.nodeName === 'entityServiceDefinition' || p.nodeName === 'implementations') {
+                                isNestedParam = true; break;
+                            }
+                            p = p.parentNode;
+                        }
+                    }
+                    
+                    const name = n.getElementsByTagName('name')[0]?.textContent;
+                    if (name) {
+                        if (!data.elements.has(typeKey)) data.elements.set(typeKey, new Map());
+                        const elMap = data.elements.get(typeKey);
+                        if (!elMap.has(name)) elMap.set(name, { core: null, custom: null, extPoint: ep, fileCore: null, fileCustom: null, isNested: isNestedParam });
+                        
+                        const item = elMap.get(name);
+                        if (isCustom) { item.custom = n; item.fileCustom = sourceFileObj; item.extPoint = ep || item.extPoint; } 
+                        else { item.core = n; item.fileCore = sourceFileObj; if(!item.extPoint) item.extPoint = ep; }
+                        item.isNested = item.isNested !== false ? isNestedParam : false;
+                    }
+                }
+
+                if (isServiceImpl && parentService) {
+                    if (!data.serviceImpls.has(parentService)) data.serviceImpls.set(parentService, []);
+                    data.serviceImpls.get(parentService).push({ node: n, file: sourceFileObj, isCustom });
+                }
+
+                Array.from(n.childNodes).forEach(child => { if (child.nodeType === 1) extractFromNode(child, ep, sourceFileObj, isCustom, forcedNested); });
+            };
+
+            if (isMain && rootNode.nodeName.toLowerCase().includes('entity')) { data.root = rootNode; data.rootSourceFile = file; } 
+            else if (isContext && rootNode.nodeName.toLowerCase().includes('neoncontext')) { data.contextRoot = rootNode; data.contextSourceFile = file; rootNode.querySelectorAll('neonViewReference > view').forEach(n => expectedViews.add(n.textContent.trim())); }
+            
+            let extPoint = null;
+            if (rootNode.nodeName === 'modification') {
+                const mType = xml.getElementsByTagName('modelType')[0]?.textContent || "";
+                if (mType === 'neonView') { viewMods.push({ xml, file, isCustom: isCustomMod }); continue; }
+
+                const mName = xml.getElementsByTagName('modelName')[0]?.textContent || "";
+                if (mType !== 'entity') continue; 
+                if (mName.toLowerCase() !== expectedModelName && mName.toLowerCase() !== baseLower) continue;
+                
+                const cType = xml.getElementsByTagName('changeType')[0]?.textContent || "";
+                const pathText = xml.getElementsByTagName('path')[0]?.textContent || "";
+                const pathParts = pathText.split('/');
+                
+                const implIdx = pathParts.indexOf('implementations');
+                if (implIdx > 0) { extPoint = pathParts[implIdx - 1]; } 
+                else { extPoint = xml.getElementsByTagName('targetExtensionPoint')[0]?.textContent || null; if (extPoint && extPoint.includes('/')) extPoint = extPoint.split('/').pop(); }
+
+                if (cType === 'MODIFY') {
+                    const elName = pathParts[pathParts.length - 2];
+                    const propName = pathParts[pathParts.length - 1];
+                    let val = "";
+                    const valNodes = xml.getElementsByTagName('value');
+                    if (valNodes.length > 0) {
+                        const innerValNode = valNodes[valNodes.length - 1]; 
+                        const firstElem = innerValNode.firstElementChild;
+                        if (firstElem && propName !== 'dependency') {
+                             if (firstElem.hasAttribute('v')) val = firstElem.getAttribute('v');
+                             else if (firstElem.hasAttribute('value')) val = firstElem.getAttribute('value');
+                             else {
+                                 const childProps = Array.from(firstElem.childNodes).filter(sub => sub.nodeType === 1 && sub.nodeName !== 'name').map(sub => `${sub.nodeName}: ${sub.textContent.trim()}`);
+                                 val = childProps.length > 0 ? childProps.join(' | ') : firstElem.textContent.trim();
+                             }
+                        } else {
+                            val = innerValNode.textContent.trim();
+                            if (val === "") {
+                                if (innerValNode.hasAttribute('v')) val = innerValNode.getAttribute('v');
+                                else if (innerValNode.hasAttribute('value')) val = innerValNode.getAttribute('value');
+                            }
+                        }
+                    }
+                    
+                    const isProc = ADITO_PROCESS_NAMES.has(propName);
+                    let targetKey = (pathParts.length === 2) ? '_ROOT_' : elName;
+                    
+                    if (targetKey && propName) {
+                        if (!data.overrides.has(targetKey)) data.overrides.set(targetKey, { props: {}, procs: {}, isCustom: isCustomMod, file: file });
+                        if (isProc) { data.overrides.get(targetKey).procs[propName] = val; } 
+                        else if (propName === 'dependency' && valNodes.length > 0) {
+                            const firstElem = valNodes[valNodes.length - 1]?.firstElementChild;
+                            if (firstElem) {
+                                Array.from(firstElem.childNodes).forEach(sub => {
+                                    if (sub.nodeType === 1 && sub.nodeName !== 'name') data.overrides.get(targetKey).props[sub.nodeName] = sub.textContent.trim();
+                                });
+                            }
+                        } else { data.overrides.get(targetKey).props[propName] = val; }
+                    }
+                    continue; 
+                } else if (cType === 'INSERT') {
+                    const wrappers = xml.getElementsByTagName('modelValueWrapper');
+                    if (wrappers.length > 0) {
+                        const innerValues = Array.from(wrappers[0].childNodes).filter(n => n.nodeName === 'value');
+                        if (innerValues.length > 0) {
+                            const injectedNode = Array.from(innerValues[0].childNodes).find(n => n.nodeType === 1);
+                            if (injectedNode) {
+                                let targetName = null;
+                                const rcIdx = pathParts.indexOf('recordContainers');
+                                const efIdx = pathParts.indexOf('entityFields');
+                                
+                                if (rcIdx >= 0 && pathParts.length > rcIdx + 1) targetName = pathParts[rcIdx + 1];
+                                else if (efIdx >= 0 && pathParts.includes('implementations')) {
+                                    const pathImplIdx = pathParts.indexOf('implementations');
+                                    if (pathImplIdx > 0) targetName = pathParts[pathImplIdx - 1];
+                                }
+                                
+                                if (targetName) {
+                                    if (!data.overrides.has(targetName)) data.overrides.set(targetName, { props: {}, procs: {}, injectedChildren: [], isCustom: isCustomMod, file: file });
+                                    if (!data.overrides.get(targetName).injectedChildren) data.overrides.get(targetName).injectedChildren = [];
+                                    data.overrides.get(targetName).injectedChildren.push(injectedNode);
+                                }
+                                extractFromNode(injectedNode, extPoint, file, isCustomMod, true);
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+            extractFromNode(rootNode, extPoint, file, isCustomMod);
+        }
+    }
+    
+    const viewMap = new Map();
+    const baseNamePrefix = ctxName ? ctxName.toLowerCase() : baseLower;
+    
+    for (let [pathKey, file] of map.entries()) {
+        const pathLower = pathKey.toLowerCase();
+        // FIX: Views auch dann erkennen, wenn sie direkt im Root der Dateiauswahl liegen
+        if ((pathLower.includes('/neonview/') || pathLower.startsWith('neonview/')) && pathLower.endsWith('.aod')) {
+            const viewName = pathKey.split('/').pop().replace('.aod', ''); 
+            let isRelated = false;
+            const viewNameLower = viewName.toLowerCase();
+            const ctxLower = ctxName ? ctxName.toLowerCase() : "";
+            
+            if (viewNameLower.startsWith(baseLower) || (ctxLower && viewNameLower.startsWith(ctxLower)) || expectedViews.has(viewName)) isRelated = true;
+
+            if (isRelated) {
+                const text = await safeReadText(file);
+                if (text) {
+                    const xml = new DOMParser().parseFromString(text, "text/xml");
+                    const isCustom = !file.webkitRelativePath.toLowerCase().includes('node_modules');
+                    viewMap.set(viewName, { node: xml.documentElement, file: file, isCustom: isCustom });
+                }
+            }
+        }
+    }
+
+    for (let mod of viewMods) {
+        const mName = mod.xml.getElementsByTagName('modelName')[0]?.textContent?.trim();
+        const viewData = viewMap.get(mName);
+        if (!viewData) continue;
+
+        const cType = mod.xml.getElementsByTagName('changeType')[0]?.textContent;
+        const pathText = mod.xml.getElementsByTagName('path')[0]?.textContent || "";
+
+        if (cType === 'INSERT') {
+            const wrappers = mod.xml.getElementsByTagName('modelValueWrapper');
+            if (wrappers.length > 0) {
+                const innerValues = Array.from(wrappers[0].childNodes).filter(n => n.nodeName === 'value');
+                if (innerValues.length > 0) {
+                    const injectedNode = Array.from(innerValues[0].childNodes).find(n => n.nodeType === 1);
+                    if (injectedNode) {
+                        const match = pathText.match(/children\/([^\/]+)/);
+                        const extName = match ? match[1] : "ExtensionPoint";
+                        injectedNode.setAttribute('data-ext-point', extName);
+                        injectedNode.setAttribute('data-is-custom', mod.isCustom ? 'true' : 'false');
+                        let childrenNode = Array.from(viewData.node.childNodes).find(n => n.nodeName === 'children');
+                        if (!childrenNode) { childrenNode = viewData.node.ownerDocument.createElement('children'); viewData.node.appendChild(childrenNode); }
+                        childrenNode.appendChild(injectedNode);
+                    }
+                }
+            }
+        }
+    }
+
+    if (viewMap.size > 0) data.elements.set('neonView', viewMap);
+    return data;
+}
+
+const getProps = (el) => {
+    if (!el) return undefined;
+    const props = {};
+    Array.from(el.childNodes || []).forEach(n => {
+        if(n.nodeType !== 1) return;
+        if(ADITO_PROCESS_NAMES.has(n.nodeName) || IGNORED_STRUCTURAL_NODES.has(n.nodeName) || n.nodeName === 'name') return; 
+        
+        if (n.nodeName === 'dependency') {
+            Array.from(n.childNodes).forEach(sub => {
+                if (sub.nodeType === 1 && sub.nodeName !== 'name') props[sub.nodeName] = sub.textContent.trim();
+            });
+            return;
+        }
+        
+        let val = n.textContent.trim();
+        if (n.firstElementChild) {
+            if (n.nodeName === 'layout') val = n.firstElementChild.nodeName; 
+            else if (n.nodeName === 'consumerMapping') {
+                val = Array.from(n.childNodes).filter(sub => sub.nodeType === 1 && sub.nodeName !== 'name').map(sub => `${sub.nodeName}: ${sub.textContent.trim()}`).join(' | ');
+            } else {
+                const childTexts = Array.from(n.childNodes).filter(sub => sub.nodeType === 1 && sub.nodeName !== 'name').map(sub => `${sub.nodeName}: ${sub.textContent.trim()}`);
+                if (childTexts.length > 0) val = childTexts.join(' | ');
+            }
+        } else if (val === "") {
+            if (n.hasAttribute('v')) val = n.getAttribute('v');
+            else if (n.hasAttribute('value')) val = n.getAttribute('value');
+        }
+        if (val) props[n.nodeName] = val;
+    });
+
+    if (el.nodeName === 'entityProvider' && props['usePermissions'] === undefined) props['usePermissions'] = "true";
+    return props;
+};
+
+async function calcElementStatus(p1, p2Target, el1, el2Target, overrides) {
+    if (!el1 && el2Target) return 'N'; 
+    if (el1 && !el2Target) return 'D'; 
+    if (!el1 && !el2Target) return 'E';
+    
+    const hasPropChanges = [...new Set([...Object.keys(p1||{}), ...Object.keys(p2Target||{})])].some(k => !isPropEqual(p1?.[k], p2Target?.[k]));
+    if (hasPropChanges) return 'C';
+    if (overrides && Object.keys(overrides.procs || {}).length > 0) return 'C';
+
+    const getProcs = el => Array.from(el.childNodes).filter(n => n.nodeType === 1 && ADITO_PROCESS_NAMES.has(n.nodeName)).map(n => n.textContent);
+    const procs1 = getProcs(el1); const procs2 = getProcs(el2Target);
+    if (procs1.length !== procs2.length) return 'C';
+
+    for (let p of new Set([...procs1, ...procs2])) {
+        const f1 = getFileRef(files1, p); const f2 = getFileRef(files2, p);
+        if (!f1 && f2) return 'C'; if (f1 && !f2) return 'C';
+        if (f1 && f2) {
+            const txt1 = await safeReadText(f1) || '';
+            const txt2 = await safeReadText(f2) || '';
+            if (!(await checkSmartEquality(txt1, txt2))) return 'C'; 
+        }
+    }
+    return 'E';
+}
+
+// ═══ Tree Construction ═══
+async function buildTree() {
+    if(!currentEntity) return;
+    
+    S('tree-container').innerHTML = '<div class="p-4 text-secondary text-center"><i class="fa-solid fa-spinner fa-spin fa-2x mb-2"></i><br>Analysiere Diff & Formatiere Code...</div>';
+    S('pane1').innerHTML = ''; S('pane2').innerHTML = ''; S('view-title').innerHTML = 'Bitte ein Element auswählen';
+    window.activeView = null;
+    
+    const data1 = await getEntityData(files1, currentEntity);
+    const data2 = await getEntityData(files2, currentEntity);
+    
+    S('tree-container').innerHTML = '';
+    entitySummaryData = []; 
+
+    for (const cat of cats) {
+        const map1 = data1.elements.get(cat.t) || new Map();
+        const map2 = data2.elements.get(cat.t) || new Map();
+        const names = [...new Set([...map1.keys(), ...map2.keys()])];
+        
+        let visibleCount = 0; let validNames = [];
+        
+        if (!cat.isSingle) {
+            for (let name of names) {
+                const node1 = map1.get(name), node2 = map2.get(name);
+                if (cat.t === 'entityParameter' || cat.t === 'consumerMapping' || cat.t === 'recordFieldMapping' || cat.t === 'serviceImplementation') {
+                    const isN1 = node1 ? node1.isNested : true;
+                    const isN2 = node2 ? node2.isNested : true;
+                    if (isN1 && isN2) continue; 
+                }
+                visibleCount++; validNames.push(name);
+            }
+        } else {
+            if (data1.root || data2.root) visibleCount = 1;
+        }
+
+        const headerText = cat.isSingle ? cat.l : `${cat.l} <span class="badge bg-dark border border-secondary text-light ms-2" style="font-size:10px; padding:2px 6px;">${visibleCount}</span>`;
+        const group = document.createElement('div');
+        const header = createRow(0, cat.icon, headerText, 'E', null, cat.color, false, '', 'hdr_' + cat.t);
+        header.classList.add('group-header'); header.onclick = () => header.classList.toggle('collapsed'); 
+        const sub = document.createElement('div'); sub.className = 'tree-sub';
+        let hasItems = false;
+
+        if(cat.isSingle) {
+            if (data1.root || data2.root) {
+                hasItems = true;
+                const el1 = data1.root, el2Core = data2.root;
+                const overrides = data2.overrides.get('_ROOT_');
+                const dataSourceFile1 = data1.rootSourceFile; 
+                const dataSourceFile2 = data2.rootSourceFile;
+                const isCustomRoot = dataSourceFile2 && !dataSourceFile2.webkitRelativePath.includes('node_modules');
+                
+                const p1 = getProps(el1), p2Core = getProps(el2Core);
+                let p2Custom = overrides && el2Core ? { ...p2Core, ...overrides.props } : null;
+                const isCustom = isCustomRoot || !!overrides;
+                const file2Target = (overrides?.file) || dataSourceFile2;
+                
+                const status = await calcElementStatus(p1, isCustom ? p2Custom : p2Core, el1, el2Core, overrides);
+                const rItem = createRow(1, cat.icon, currentEntity, status, null, cat.color, isCustom, '', 'root_' + currentEntity);
+                
+                const hasBoth = !!el2Core && (isCustomRoot || !!overrides);
+                attachRowEvents(rItem, cat.l, p1, p2Core, p2Custom, null, isCustom, dataSourceFile1, dataSourceFile2, file2Target, hasBoth, null, el1, el2Core, null, cat.t);
+                
+                const pSub = document.createElement('div'); pSub.className = 'tree-sub';
+                
+                if (data1.contextRoot || data2.contextRoot) {
+                    const ctxEl1 = data1.contextRoot, ctxEl2Core = data2.contextRoot;
+                    const ctxFile1 = data1.contextSourceFile, ctxFile2Core = data2.contextSourceFile;
+                    const ctxIsCustom = ctxFile2Core && !ctxFile2Core.webkitRelativePath.includes('node_modules');
+                    const ctxP1 = getProps(ctxEl1), ctxP2Core = getProps(ctxEl2Core);
+                    const ctxStatus = await calcElementStatus(ctxP1, ctxP2Core, ctxEl1, ctxEl2Core, null);
+                    const ctxTitle = globalRefIndex.entityToContext.get((currentEntity).toLowerCase()) || currentEntity.replace('_entity', '');
+                    
+                    const ctxRow = createRow(2, 'fa-cube', ctxTitle + ' (neonContext)', ctxStatus, null, '#e84393', ctxIsCustom, '', 'ctx_' + ctxTitle);
+                    attachRowEvents(ctxRow, 'Context (neonContext)', ctxP1, ctxP2Core, null, null, ctxIsCustom, ctxFile1, ctxFile2Core, ctxFile2Core, !!ctxEl2Core && ctxIsCustom, null, ctxEl1, ctxEl2Core, null, 'context');
+                    
+                    const ctxPSub = document.createElement('div'); ctxPSub.className = 'tree-sub';
+                    await addSubNodes(ctxPSub, ctxEl1, ctxEl2Core, null, null, 3, data2.overrides, data1, data2, ctxTitle, 'context');
+                    
+                    ctxRow.appendChild(ctxPSub); toggleArrowVisibility(ctxRow, ctxPSub.childNodes.length > 0); pSub.appendChild(ctxRow);    
+                }
+                
+                await addSubNodes(pSub, el1, el2Core, null, overrides, 2, data2.overrides, data1, data2, currentEntity, 'entity');
+                sub.append(rItem, pSub); toggleArrowVisibility(rItem, pSub.childNodes.length > 0);
+            }
+        } else {
+            if(validNames.length > 0) hasItems = true;
+            const rootItems = []; const extGroups = new Map();
+            validNames.sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+
+            for (let name of validNames) {
+                const node1 = map1.get(name), node2 = map2.get(name);
+                let el1, el2Core = null, el2Custom = null, file1 = null, fileCore = null, fileCustom = null, extInfo = null;
+                
+                if (cat.t === 'neonView') {
+                    el1 = node1?.node; file1 = node1?.file;
+                    if (node2) {
+                        if (node2.isCustom) { el2Custom = node2.node; fileCustom = node2.file; }
+                        else { el2Core = node2.node; fileCore = node2.file; }
+                    }
+                } else {
+                    el1 = node1?.core || node1?.custom; el2Core = node2?.core; el2Custom = node2?.custom;
+                    file1 = node1?.fileCore || node1?.fileCustom; fileCore = node2?.fileCore; fileCustom = node2?.fileCustom;
+                    extInfo = node2?.extPoint || node1?.extPoint || null; 
+                }
+                
+                const overrides = data2.overrides.get(name);
+                const p1 = getProps(el1); const p2Core = getProps(el2Core);
+                let p2Custom = null;
+                
+                const hasPropOverrides = overrides && (Object.keys(overrides.props || {}).length > 0 || Object.keys(overrides.procs || {}).length > 0);
+                let isCustom = !!el2Custom || hasPropOverrides;
+
+                if (el2Custom) {
+                    p2Custom = getProps(el2Custom);
+                    if (overrides) p2Custom = { ...p2Custom, ...overrides.props };
+                } else if (hasPropOverrides && el2Core) { p2Custom = { ...p2Core, ...overrides.props }; } 
+                else if (hasPropOverrides && !el2Core) { p2Custom = { ...overrides.props }; }
+                
+                const p2Target = isCustom ? p2Custom : p2Core;
+                const el2Target = el2Custom || el2Core;
+                const status = await calcElementStatus(p1, p2Target, el1, el2Target, overrides);
+                
+                let extraBadges = '';
+                if (cat.t === 'neonView') {
+                    if (data2.contextRoot || data1.contextRoot) {
+                        const defaultViewTags = {};
+                        const ctxNode = data2.contextRoot || data1.contextRoot;
+                        ['mainView', 'filterView', 'editView', 'previewView', 'previewMultipleView', 'lookupView'].forEach(tag => {
+                            const el = ctxNode.getElementsByTagName(tag)[0];
+                            if (el && el.textContent) defaultViewTags[el.textContent.trim()] = tag;
+                        });
+                        if (defaultViewTags[name]) {
+                            const tagMap = { 'mainView': 'MAIN', 'filterView': 'FILTER', 'editView': 'EDIT', 'previewView': 'PREVIEW', 'lookupView': 'LOOKUP', 'previewMultipleView': 'MULTI PREV' };
+                            extraBadges += `<span class="badge bg-primary ms-2 shadow-sm" style="font-size:9px;">${tagMap[defaultViewTags[name]] || defaultViewTags[name]}</span>`;
+                        }
+                    }
+                    let refsCount = 0;
+                    if (globalRefIndex.viewUsage && globalRefIndex.viewUsage.has(name)) { globalRefIndex.viewUsage.get(name).forEach(views => { refsCount += views.size; }); }
+                    if (refsCount > 0) { extraBadges += `<span class="badge bg-secondary ms-1 shadow-sm" title="Referenziert in anderen Views"><i class="fa-solid fa-link"></i> ${refsCount}</span>`; }
+                }
+
+                const itemData = { name, el1, el2Core, el2Custom, overrides, p1, p2Core, p2Custom, file1, file2Core: fileCore, file2Custom: fileCustom || overrides?.file, extInfo, isCustom, status, extraBadges };
+                if (extInfo) {
+                    if (!extGroups.has(extInfo)) extGroups.set(extInfo, []);
+                    extGroups.get(extInfo).push(itemData);
+                } else { rootItems.push(itemData); }
+            }
+            
+            const sortedExts = [...extGroups.keys()].sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+            
+            for (let item of rootItems) {
+                entitySummaryData.push({ type: cat.l, name: item.name, status: item.status, extInfo: null, isCustom: item.isCustom });
+                const row = createRow(1, cat.icon, item.name, item.status, null, cat.color, item.isCustom, item.extraBadges, 'item_' + cat.t + '_' + item.name);
+                const hasBoth = !!item.el2Core && (!!item.el2Custom || !!item.overrides);
+                let usageList = cat.t === 'neonView' && globalRefIndex.viewUsage.has(item.name) ? globalRefIndex.viewUsage.get(item.name) : null;
+                
+                attachRowEvents(row, item.name, item.p1, item.p2Core, item.p2Custom, null, item.isCustom, item.file1, item.file2Core, item.file2Custom, hasBoth, usageList, item.el1, item.el2Core, item.el2Custom, cat.t);
+                
+                const pSub = document.createElement('div'); pSub.className = 'tree-sub';
+                await addSubNodes(pSub, item.el1, item.el2Core, item.el2Custom, item.overrides, 2, data2.overrides, data1, data2, item.name, cat.t);
+                sub.append(row, pSub); toggleArrowVisibility(row, pSub.childNodes.length > 0);
+            }
+            
+            for (let extName of sortedExts) {
+                const extRow = createRow(1, 'ext-icon', extName, 'E', null, 'var(--bs-info)', false, '', 'ext_' + cat.t + '_' + extName);
+                extRow.onclick = (e) => { e.stopPropagation(); extRow.classList.toggle('collapsed'); };
+                const extSub = document.createElement('div'); extSub.className = 'tree-sub';
+                
+                const groupItems = extGroups.get(extName).sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity: 'base'}));
+                for (let item of groupItems) {
+                    entitySummaryData.push({ type: cat.l, name: item.name, status: item.status, extInfo: item.extInfo, isCustom: item.isCustom });
+                    const row = createRow(2, cat.icon, item.name, item.status, null, cat.color, item.isCustom, item.extraBadges, 'item_' + cat.t + '_' + item.name);
+                    const hasBoth = !!item.el2Core && (!!item.el2Custom || !!item.overrides);
+                    let usageList = cat.t === 'neonView' && globalRefIndex.viewUsage.has(item.name) ? globalRefIndex.viewUsage.get(item.name) : null;
+
+                    attachRowEvents(row, item.name, item.p1, item.p2Core, item.p2Custom, item.extInfo, item.isCustom, item.file1, item.file2Core, item.file2Custom, hasBoth, usageList, item.el1, item.el2Core, item.el2Custom, cat.t);
+                    
+                    const pSub = document.createElement('div'); pSub.className = 'tree-sub';
+                    await addSubNodes(pSub, item.el1, item.el2Core, item.el2Custom, item.overrides, 3, data2.overrides, data1, data2, item.name, cat.t);
+                    extSub.append(row, pSub); toggleArrowVisibility(row, pSub.childNodes.length > 0);
+                }
+                sub.append(extRow, extSub); toggleArrowVisibility(extRow, true);
+            }
+        }
+        
+        if (hasItems) {
+            toggleArrowVisibility(header, sub.childNodes.length > 0);
+            group.append(header, sub); S('tree-container').appendChild(group);
+        }
+    }
+    
+    // WICHTIG: Baumzustand nach dem Rendern wiederherstellen
+    restoreTreeState();
+}
+
+// ═══ Event Attachment & View State ═══
+function attachRowEvents(rowEl, name, p1, p2Core, p2Custom, extInfo, isCustom, file1, file2Core, file2Custom, hasBoth, usageList, el1, el2Core, el2Custom, itemType) {
+    const caret = rowEl.querySelector('.toggle-icon');
+    if (caret) caret.onclick = (e) => { e.stopPropagation(); rowEl.classList.toggle('collapsed'); };
+    
+    rowEl.onclick = async (e) => { 
+        e.stopPropagation(); setActive(rowEl); 
+        window.activeView = {
+            view: 'props', name, p1, p2Core, p2Custom, extInfo, isCustomElement: isCustom,
+            mode: (isCustom && p2Custom) ? 'custom' : 'core', file1, file2Core, file2Custom, hasBoth, usageList,
+            el1, el2Core, el2Custom, itemType
+        };
+        await renderCurrentView();
+    };
+}
+
+async function addSubNodes(parent, el1, el2Core, el2Custom, itemOverrides, depth, allOverrides, data1, data2, parentName, parentType) {
+    const getProcs = (el) => {
+        let list = [];
+        if (!el) return list;
+        Array.from(el.childNodes).forEach(n => {
+            if (n.nodeType === 1 && ADITO_PROCESS_NAMES.has(n.nodeName)) list.push({ t: n.nodeName, v: n.textContent, rawName: n.nodeName });
+        });
+        return list;
+    };
+    
+    const l1 = getProcs(el1); const l2C = getProcs(el2Core);
+    let l2Cu = el2Custom ? getProcs(el2Custom) : l2C.map(x => ({...x}));
+
+    if (itemOverrides && itemOverrides.procs) {
+        for (let [k, v] of Object.entries(itemOverrides.procs)) {
+            const idx = l2Cu.findIndex(x => x.t === k || x.rawName === k);
+            if (idx >= 0) l2Cu[idx].v = v; else l2Cu.push({t: k, v: v, rawName: k});
+        }
+    }
+
+    const allTags = [...new Set([...l1, ...l2C, ...l2Cu].map(x => x.t))];
+
+    for (let t of allTags) {
+        const v1 = l1.find(y => y.t === t)?.v;
+        const v2Core = l2C.find(y => y.t === t)?.v;
+        const v2Custom = l2Cu.find(y => y.t === t)?.v;
+
+        const f1 = getFileRef(files1, v1);
+        const f2Core = getFileRef(files2, v2Core);
+        const f2Custom = getFileRef(files2, v2Custom); 
+
+        const hasBoth = !!f2Core && !!f2Custom && (v2Core !== v2Custom);
+        const isCustomProc = hasBoth || (!v2Core && !!v2Custom);
+        const f2Target = isCustomProc ? f2Custom : f2Core;
+        
+        let status = 'E';
+        if (!f1 && f2Target) status = 'N';
+        else if (f1 && !f2Target) status = 'D';
+        else if (f1 && f2Target) {
+            const txt1 = await safeReadText(f1) || '';
+            const txt2 = await safeReadText(f2Target) || '';
+            status = (await checkSmartEquality(txt1, txt2)) ? 'E' : 'C';
+        }
+
+        const row = createRow(depth, 'fa-file-code', t, status, null, 'var(--bs-secondary)', isCustomProc, '', 'proc_' + parentType + '_' + parentName + '_' + t);
+        toggleArrowVisibility(row, false); row.style.fontStyle = 'italic';
+        
+        row.onclick = async (e) => { 
+            e.stopPropagation(); setActive(row); 
+            S('view-title').innerHTML = `<i class="fa-solid fa-spinner fa-spin me-2"></i> Lade Prozess live...`;
+            
+            const s1 = await safeReadText(f1) || '';
+            const s2Core = await safeReadText(f2Core) || '';
+            const s2Custom = await safeReadText(f2Custom) || '';
+
+            window.activeView = {
+                view: 'diff', title: t, s1, s2Core, s2Custom, isCustomProc,
+                mode: isCustomProc ? 'custom' : 'core', 
+                file1: f1, file2Core: f2Core, file2Custom: f2Custom, hasBoth
+            };
+            await renderCurrentView();
+        };
+        parent.appendChild(row);
+    }
+
+    const getChildParams = (el, overridesParam) => {
+        let list = [];
+        if (!el) return list;
+        Array.from(el.childNodes).forEach(n => {
+            if (n.nodeType !== 1) return;
+            if (n.nodeName === 'children' || n.nodeName === 'recordFieldMappings' || n.nodeName === 'implementations') {
+                list.push(...getChildParams(n, null));
+            }
+            if (n.nodeName === 'entityParameter' || n.nodeName === 'consumerMapping' || n.nodeName.endsWith('RecordFieldMapping') || n.nodeName.endsWith('FieldDbMapping') || n.nodeName === 'serviceImplementation') {
+                const nm = Array.from(n.childNodes).find(c => c.nodeName === 'name')?.textContent;
+                const tag = n.nodeName.endsWith('Mapping') ? (n.nodeName === 'consumerMapping' ? 'consumerMapping' : 'recordFieldMapping') : n.nodeName;
+                if (nm) list.push({ name: nm, tag: tag });
+            }
+        });
+        
+        if (overridesParam && overridesParam.injectedChildren) {
+            overridesParam.injectedChildren.forEach(n => {
+                if (n.nodeType === 1) {
+                    if (n.nodeName.endsWith('RecordFieldMapping') || n.nodeName.endsWith('FieldDbMapping')) {
+                        const nm = Array.from(n.childNodes).find(c => c.nodeName === 'name')?.textContent;
+                        if (nm) list.push({ name: nm, tag: 'recordFieldMapping' });
+                    } else if (n.nodeName === 'serviceImplementation') {
+                        const nm = Array.from(n.childNodes).find(c => c.nodeName === 'name')?.textContent;
+                        if (nm) list.push({ name: nm, tag: 'serviceImplementation' });
+                    }
+                }
+            });
+        }
+        return list;
+    };
+
+    let childParams = [...getChildParams(el1, null), ...getChildParams(el2Core, null), ...getChildParams(el2Custom, itemOverrides)];
+    
+    if (parentType === 'entityServiceDefinition' && parentName) {
+        const addStandaloneImpls = (implList) => {
+            if (!implList) return;
+            implList.forEach(impl => {
+                const nm = Array.from(impl.node.childNodes).find(c => c.nodeName === 'name')?.textContent;
+                if (nm) childParams.push({ name: nm, tag: 'serviceImplementation' });
+            });
+        };
+        addStandaloneImpls(data1.serviceImpls?.get(parentName));
+        addStandaloneImpls(data2.serviceImpls?.get(parentName));
+    }
+
+    let uniqueParams = []; let seen = new Set();
+    for (let cp of childParams) { if (!seen.has(cp.name)) { seen.add(cp.name); uniqueParams.push(cp); } }
+
+    for (let cp of uniqueParams) {
+        let catTag = cp.tag;
+        const map1 = data1.elements.get(catTag) || new Map();
+        const map2 = data2.elements.get(catTag) || new Map();
+        
+        const node1 = map1.get(cp.name), node2 = map2.get(cp.name);
+        if (!node1 && !node2) continue; 
+        
+        let c_el1 = node1?.core || node1?.custom;
+        let c_el2Core = node2?.core; let c_el2Custom = node2?.custom;
+        let c_file1 = node1?.fileCore || node1?.fileCustom;
+        let c_fileCore = node2?.fileCore; let c_fileCustom = node2?.fileCustom;
+        let c_overrides = allOverrides ? allOverrides.get(cp.name) : null;
+        
+        let c_p1 = getProps(c_el1), c_p2Core = getProps(c_el2Core);
+        let c_p2Custom = null;
+        
+        const c_hasPropOverrides = c_overrides && (Object.keys(c_overrides.props || {}).length > 0 || Object.keys(c_overrides.procs || {}).length > 0);
+        let c_isCustom = !!c_el2Custom || c_hasPropOverrides;
+        
+        if (c_el2Custom) {
+            c_p2Custom = getProps(c_el2Custom);
+            if (c_overrides) c_p2Custom = { ...c_p2Custom, ...c_overrides.props };
+        } else if (c_hasPropOverrides && c_el2Core) { c_p2Custom = { ...c_p2Core, ...c_overrides.props }; }
+        else if (c_hasPropOverrides && !c_el2Core) { c_p2Custom = { ...c_overrides.props }; }
+        
+        const c_p2Target = c_isCustom ? c_p2Custom : c_p2Core;
+        const c_el2Target = c_el2Custom || c_el2Core;
+        const c_status = await calcElementStatus(c_p1, c_p2Target, c_el1, c_el2Target, c_overrides);
+        
+        const pIcon = cp.tag === 'consumerMapping' ? 'fa-map-location-dot' : (cp.tag === 'recordFieldMapping' ? 'fa-database' : (cp.tag === 'serviceImplementation' ? 'fa-cog' : 'fa-sliders'));
+        const color = cp.tag === 'recordFieldMapping' ? '#e67e22' : (cp.tag === 'serviceImplementation' ? '#1abc9c' : '#f1c40f');
+        const row = createRow(depth, pIcon, cp.name, c_status, null, color, c_isCustom, '', 'child_' + catTag + '_' + cp.name);
+        
+        const hasBoth = !!c_el2Core && (!!c_el2Custom || !!c_overrides);
+        attachRowEvents(row, cp.name, c_p1, c_p2Core, c_p2Custom, null, c_isCustom, c_file1, c_fileCore, c_fileCustom || c_overrides?.file, hasBoth, null, c_el1, c_el2Core, c_el2Custom, catTag);
+        
+        const pSub = document.createElement('div'); pSub.className = 'tree-sub';
+        await addSubNodes(pSub, c_el1, c_el2Core, c_el2Custom, c_overrides, depth + 1, allOverrides, data1, data2, cp.name, catTag);
+        
+        toggleArrowVisibility(row, pSub.childNodes.length > 0);
+        parent.append(row, pSub);
+    }
+}
+
+// ═══ Render Logic ═══
+async function renderCurrentView() {
+    if (!window.activeView) return;
+    const v = window.activeView;
+    
+    if (v.view === 'props') {
+        const p2Active = v.mode === 'custom' ? v.p2Custom : v.p2Core;
+        const targetFile = v.mode === 'custom' ? (v.file2Custom || v.file2Core) : v.file2Core;
+        const el2Active = v.mode === 'custom' ? (v.el2Custom || v.el2Core) : v.el2Core;
+        updateDebugPanel(v.file1, targetFile);
+        renderPropsHtml(v.name, v.p1, p2Active, v.extInfo, v.isCustomElement, v.mode, v.hasBoth, v.usageList, v.el1, el2Active, v.itemType, v.mode);
+        
+    } else if (v.view === 'diff') {
+        const s2Active = v.mode === 'custom' ? v.s2Custom : v.s2Core;
+        const targetFile = v.mode === 'custom' ? (v.file2Custom || v.file2Core) : v.file2Core;
+        updateDebugPanel(v.file1, targetFile);
+        await renderDiffHtml(v.s1, s2Active, v.title, v.mode, v.hasBoth);
+    }
+}
+
+async function setMode(newMode) {
+    if (window.activeView) {
+        window.activeView.mode = newMode;
+        await renderCurrentView();
+    }
+}
+
+function renderPropsHtml(name, p1, p2Active, extInfo, isCustomElement, mode, hasToggle, usageList, el1, el2Active, itemType, currentMode) {
+    S('props-view').classList.remove('d-none');
+    S('props-view').classList.add('d-flex');
+    S('diff-view-container').classList.add('d-none');
+    S('diff-view-container').classList.remove('d-flex');
+
+    const extBadge = extInfo ? `<span class="badge bg-info text-dark ms-2 align-middle" style="font-size:11px;"><i class="fa-solid fa-puzzle-piece"></i> EXT: ${escapeHtml(extInfo)}</span>` : '';
+    const custBadge = isCustomElement ? `<span class="badge badge-custom shadow-sm ms-2 align-middle" style="font-size:11px;"><i class="fa-solid fa-wrench"></i> CUSTOM</span>` : '';
+    S('view-title').innerHTML = `<i class="fa-solid fa-list text-primary me-2"></i> Properties: ${name} ${extBadge} ${custBadge}`;
+    
+    const sortedProps = [...new Set([...Object.keys(p1||{}), ...Object.keys(p2Active||{})])].sort((a, b) => {
+        const diff = (semanticOrder.indexOf(a) !== -1 ? semanticOrder.indexOf(a) : 99) - (semanticOrder.indexOf(b) !== -1 ? semanticOrder.indexOf(b) : 99);
+        return diff !== 0 ? diff : a.localeCompare(b); 
+    });
+
+    const buildTable = (dataObj, compareObj) => {
+        let html = `<table class="table table-sm table-dark mt-2" style="border: 1px solid var(--bs-border-color);"><thead style="background: rgba(0,0,0,0.2);"><tr><th style="width:30%">Property</th><th>Wert</th></tr></thead><tbody>`;
+        let hasProps = false;
+        sortedProps.forEach(p => {
+            let vData = dataObj && dataObj.hasOwnProperty(p) ? dataObj[p] : undefined;
+            let vComp = compareObj && compareObj.hasOwnProperty(p) ? compareObj[p] : undefined;
+            if (vData === undefined && vComp === undefined) return;
+            hasProps = true;
+            
+            let isDiff = !isPropEqual(vData, vComp);
+            let borderClass = isDiff ? (mode === 'custom' ? "subtle-diff-border-custom" : "subtle-diff-border") : "";
+            let valHtml = vData !== undefined ? (vData === "" ? `<i class="text-secondary small">(leeres Tag / true)</i>` : escapeHtml(vData)) : `<i class="text-muted small">(nicht vorhanden)</i>`;
+            
+            if (isDiff && vData !== undefined) {
+                let textClass = mode === 'custom' ? 'text-custom' : 'text-warning';
+                valHtml = vComp === undefined ? `<span class="text-info fw-bold">${valHtml}</span>` : `<span class="${textClass} fw-bold">${valHtml}</span>`;
+            }
+            html += `<tr><td class="${borderClass}"><b class="text-primary opacity-75">${p}</b></td><td class="font-monospace text-break">${valHtml}</td></tr>`;
+        });
+        if(!hasProps) html += `<tr><td colspan="2" class="text-muted text-center py-3">Keine Properties gefunden</td></tr>`;
+        return html + '</tbody></table>';
+    };
+
+    S('pane1').innerHTML = `<div class="d-flex justify-content-between align-items-center mb-1"><h6 class="text-secondary mb-0">Original</h6></div>` + buildTable(p1, p2Active);
+    if (itemType === 'neonView') S('pane1').innerHTML += buildViewStructureHtml(el1, "Original", "orig");
+
+    if (usageList && usageList.size > 0) {
+        let refHtml = `<div class="mt-4 p-3 rounded shadow-sm" style="background: rgba(255,255,255,0.02); border: 1px solid var(--bs-border-color);"><h6 class="text-secondary mb-3"><i class="fa-solid fa-link text-info"></i> Wird referenziert in:</h6>`;
+        for (let [ctx, views] of usageList.entries()) {
+            refHtml += `<div class="mb-3"><div class="text-primary fw-bold mb-1"><i class="fa-solid fa-cube"></i> Kontext: ${escapeHtml(ctx)}</div><div class="d-flex flex-wrap gap-2 ps-3">`;
+            views.forEach(u => refHtml += `<span class="badge bg-dark border border-secondary text-light shadow-sm"><i class="fa-regular fa-window-maximize"></i> ${escapeHtml(u)}</span>`);
+            refHtml += `</div></div>`;
+        }
+        S('pane1').innerHTML += refHtml + `</div>`;
+    }
+
+    const modularBadge = (!hasToggle && isCustomElement) ? '<span class="badge badge-custom ms-2" style="font-size:9px">CUSTOM</span>' : (!hasToggle && !isCustomElement ? '<span class="badge bg-secondary ms-2" style="font-size:9px">CORE</span>' : '');
+    
+    let pane2Header = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="d-flex align-items-center gap-2">
+                <h6 class="text-secondary mb-0">Modular ${modularBadge}</h6>
+                ${hasToggle ? `
+                    <div class="btn-group btn-group-sm ms-2 shadow-sm">
+                        <button class="btn ${currentMode === 'core' ? 'btn-secondary' : 'btn-outline-secondary'}" onclick="setMode('core')">Modul Core</button>
+                        <button class="btn ${currentMode === 'custom' ? 'btn-custom' : 'btn-outline-custom'}" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    S('pane2').innerHTML = pane2Header + buildTable(p2Active, p1);
+    if (itemType === 'neonView') S('pane2').innerHTML += buildViewStructureHtml(el2Active, "Modular", "mod");
+
+    if (name === "Entity (Root)" || name === "Context (neonContext)") {
+        let dash = `<h6 class="text-secondary mt-4"><i class="fa-solid fa-layer-group"></i> Sub-Elemente Übersicht</h6>
+            <table class="table table-sm table-dark table-hover mt-2" style="border: 1px solid var(--bs-border-color);"><thead style="background: rgba(0,0,0,0.2);"><tr><th>Typ</th><th>Name</th><th>Status</th></tr></thead><tbody>`;
+        entitySummaryData.forEach(i => {
+            const rowClass = {'N': 'text-secondary', 'D': 'text-danger fw-bold', 'C': 'text-warning fw-bold', 'E': ''}[i.status];
+            const statusTxt = {'N': 'Modular-Only', 'D': 'Fehlt', 'C': 'Geändert', 'E': 'Gleich'}[i.status];
+            const modBadge = i.extInfo ? `<span class="badge bg-info text-dark ms-2" style="font-size:9px;">EXT</span>` : '';
+            const custBadgeTable = i.isCustom ? `<span class="badge badge-custom shadow-sm ms-1" style="font-size:9px;">CUSTOM</span>` : '';
+            dash += `<tr><td class="text-muted">${i.type}</td><td class="${rowClass}">${i.name} ${modBadge} ${custBadgeTable}</td><td class="${rowClass}">${statusTxt}</td></tr>`;
+        });
+        S('pane1').innerHTML += dash + '</tbody></table>'; 
+    }
+}
+
+async function renderDiffHtml(s1, s2, title, mode, hasToggle) {
+    S('props-view').classList.add('d-none');
+    S('props-view').classList.remove('d-flex');
+    S('diff-view-container').classList.remove('d-none');
+    S('diff-view-container').classList.add('d-flex');
+
+    currentS1 = s1 || ''; currentS2 = s2 || ''; 
+    S('view-title').innerHTML = `<i class="fa-solid fa-code text-primary me-2"></i> Prozess Diff: ${title}`;
+    
+    let importWarningsHtml = '';
+    const activeCode = mode === 'custom' ? currentS2 : (currentS2 || '');
+    if (activeCode) {
+        const importsRegex = /from\s+['"]([^'"]+)['"]/g;
+        let match; let missingLibs = new Set();
+        while ((match = importsRegex.exec(activeCode)) !== null) {
+            let lib = match[1];
+            if (lib !== '@aditosoftware/jdito-types' && !lib.startsWith('.')) {
+                const libExists = [...files2.keys()].some(p => p.includes(`/process/${lib.toLowerCase()}`) || p.startsWith(`process/${lib.toLowerCase()}`) || p.endsWith(`/${lib.toLowerCase()}.aod`));
+                if (!libExists) missingLibs.add(lib);
+            }
+        }
+        if (missingLibs.size > 0) {
+            importWarningsHtml = `<div class="alert alert-danger m-2 py-2 px-3 bg-dark border-danger text-danger shadow-sm d-flex align-items-center gap-2" style="font-size: 12px;"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Achtung:</strong> Folgende importierte Bibliotheken fehlen im neuen Projekt oder wurden umbenannt: <b class="text-white">${[...missingLibs].join(', ')}</b></div></div>`;
+        }
+    }
+
+    S('diff-toolbar').innerHTML = `
+        <div class="d-flex align-items-center gap-3">
+            <h6 class="text-secondary mb-0">Code Vergleich (Smart Format)</h6>
+            <button class="btn btn-sm btn-outline-info" onclick="reloadActiveView()" title="Liest die Änderungen an diesen Dateien jetzt frisch vom Dateisystem"><i class="fa-solid fa-rotate"></i> Live Reload</button>
+            ${hasToggle ? `
+                <div class="btn-group btn-group-sm shadow-sm ms-2">
+                    <button class="btn ${mode === 'core' ? 'btn-secondary' : 'btn-outline-secondary'}" onclick="setMode('core')">Modul Core</button>
+                    <button class="btn ${mode === 'custom' ? 'btn-custom' : 'btn-outline-custom'}" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
+                </div>
+            ` : ''}
+        </div>
+        <div class="btn-group btn-group-sm">
+            <button id="copyBtn1" class="btn btn-outline-secondary" onclick="copyCode(1)" title="Kopiert unformatierten Originalcode"><i class="fa-regular fa-copy"></i> Orig. kopieren</button>
+            <button id="copyBtn2" class="btn btn-outline-secondary" onclick="copyCode(2)" title="Kopiert unformatierten Modularcode"><i class="fa-regular fa-copy"></i> Modul kopieren</button>
+        </div>
+    `;
+
+    S('diff-right-header').innerHTML = `Modular ${mode === 'custom' ? '<span class="badge badge-custom shadow-sm ms-1" style="font-size:9px">CUSTOM</span>' : '<span class="badge bg-secondary shadow-sm ms-1" style="font-size:9px">CORE</span>'}`;
+    S('diff-html-target').innerHTML = '<div class="p-5 text-secondary text-center mt-5"><i class="fa-solid fa-spinner fa-spin fa-3x mb-3"></i><br>Formatiere Code & Erstelle smartes Diff...</div>';
+    
+    await new Promise(r => setTimeout(r, 20));
+
+    let normS1 = currentS1; let normS2 = currentS2;
+    try {
+        if (normS1.trim()) normS1 = await prettier.format(normS1, prettierOpts);
+        if (normS2.trim()) normS2 = await prettier.format(normS2, prettierOpts);
+    } catch (e) { console.warn("Prettier Formatierung fehlgeschlagen.", e); }
+
+    if (normS1 === normS2) {
+        S('diff-html-target').innerHTML = importWarningsHtml + `
+            <div class="alert alert-success m-3 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm"><i class="fa-solid fa-check-circle"></i> <strong>Code ist identisch</strong> (reine Formatierungsunterschiede wurden bereinigt und ignoriert).</div>
+            <div class="p-3" style="background: #0d1117;"><pre><code class="language-javascript" style="background: transparent;">${escapeHtml(normS1)}</code></pre></div>`;
+        hljs.highlightElement(S('diff-html-target').querySelector('code'));
+        return;
+    }
+
+    const diffString = Diff.createTwoFilesPatch("Original", "Modular", normS1, normS2, "", "", { context: 99999 });
+    S('diff-html-target').innerHTML = importWarningsHtml; 
+    const configuration = { drawFileList: false, matching: 'words', outputFormat: 'side-by-side', renderNothingWhenEmpty: false, colorScheme: 'dark' };
+
+    const diff2htmlUi = new Diff2HtmlUI(S('diff-html-target'), diffString, configuration, hljs);
+    diff2htmlUi.draw(); diff2htmlUi.highlightCode(); 
+
+    if (mode === 'custom') {
+        const style = document.createElement('style');
+        style.innerHTML = `.d2h-ins { background-color: rgba(142, 68, 173, 0.2) !important; border-color: #8e44ad !important; } .d2h-ins .d2h-code-line-ctn { color: #e2a3f8 !important; }`;
+        S('diff-html-target').appendChild(style);
+    }
+}
+
+function copyCode(paneId) {
+    const textToCopy = paneId === 1 ? currentS1 : currentS2;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const btn = document.getElementById('copyBtn' + paneId);
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert';
+        btn.classList.add('text-success', 'border-success');
+        setTimeout(() => { btn.innerHTML = origHtml; btn.classList.remove('text-success', 'border-success'); }, 2000);
+    });
+}
+
+function createRow(indent, icon, text, status, extInfo = null, color = 'var(--bs-secondary)', isCustom = false, extraBadges = '', nodeId = '') {
+    const d = document.createElement('div'); 
+    d.className = 'tree-row' + (status === 'N' ? ' row-new-modular' : ''); 
+    d.style.paddingLeft = `${(indent * 20) + 10}px`;
+    d.setAttribute('data-node-id', nodeId || text); 
+    
+    const statusColor = { N: 'var(--bs-secondary)', D: 'var(--bs-danger)', C: 'var(--bs-warning)', E: 'transparent' }[status];
+    const custB = isCustom ? `<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px; padding: 3px 5px;" title="Eigenes Projekt-Customizing"><i class="fa-solid fa-wrench"></i> CUSTOM</span>` : '';
+    
+    let iconHtml = icon === 'ext-icon' ? `<span class="icon-col" style="color: ${color}"><span style="display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border:1.5px solid currentColor; border-radius:50%; font-size:8px; line-height:1;"><i class="fa-solid fa-ellipsis"></i></span></span>` : `<i class="fa-solid ${icon} icon-col" style="color: ${color}"></i>`;
+    d.innerHTML = `<i class="fa-solid fa-caret-down toggle-icon" style="visibility: hidden;"></i><span class="status-dot" style="background:${statusColor}; border:${status==='E'?'1px solid var(--bs-secondary)':'none'}"></span>${iconHtml}<span>${text} ${custB} ${extraBadges}</span>`;
+    return d;
+}
+
+S('resizer').onmousedown = () => { document.onmousemove = e => S('pane1').style.flex = `0 0 ${Math.max(10, Math.min(90, ((e.clientX - 380) / (window.innerWidth - 380)) * 100))}%`; document.onmouseup = () => document.onmousemove = null; };
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "adito-migrator",
+  "version": "1.1",
+  "main": "index.html",
+  "window": {
+    "title": "ADITO Migrator v1.1",
+    "width": 1500,
+    "height": 1000,
+    "position": "center",
+    "icon": "icon.png"
+  },
+  "dependencies": {
+    "rcedit": "^4.0.1"
+  },
+  "devDependencies": {
+    "nw": "latest",
+    "nw-builder": "^4.0.0"
+  },
+  "scripts": {
+    "start": "nw .",
+    "build": "nwbuild ./ --mode=build --version=latest --flavor=normal --platforms=win --outDir=../AditoMigrator-Build --glob=false && node cleanup.js"
+  }
+}
