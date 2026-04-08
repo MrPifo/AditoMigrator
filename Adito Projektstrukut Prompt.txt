@@ -1,0 +1,1038 @@
+KONTEXT:
+
+Ich arbeite an der Migration eines ADITO-Softwareprojekts von einer monolithischen Struktur (Original/Basic-Base) hin zu einer modularen Struktur (Modular). Zur Unterstützung haben wir ein spezialisiertes Diff-Tool entwickelt. Das Tool ist eine eigenständige HTML-Datei mit reinem JavaScript (Vanilla JS, Bootstrap 5, FontAwesome, jsdiff, Prettier, diff2html).
+
+
+
+ZIEL DES TOOLS:
+
+Zwei ADITO-Projektstände (lokale Ordner) in den Browser laden, die XML-Strukturen (.aod Dateien) und JavaScript-Prozesse analysieren und Unterschiede auf Feld-, Eigenschafts- und Prozessebene visuell darstellen. Das Tool unterscheidet streng zwischen Standard-Modul-Code (Core) und eigenem Projekt-Customizing.
+
+
+
+1. ADITO PROJEKTSTRUKTUREN & REGELN
+
+- Original-Projekt: Meist monolithisch. Entitäten liegen in `entity/[EntityName]_entity/` (oft eine große .aod-Datei).
+
+- Modular-Projekt (Core): Liegt in `node_modules/@aditosoftware/[Modul]/...`. Nutzt "Split-AODs" (z.B. Ordner `entityFields/` mit vielen kleinen .aod-Dateien).
+
+- Modular-Projekt (Customizing): Eigene Modifikationen liegen im Stammordner unter `modification/` (Dateinamen sind UUIDs). Selbst erstellte Dateien (z.B. Custom Views) liegen in Root-Ordnern (z.B. `neonView/`).
+
+- Ignorierte Dateien: Der Ordner `dist/` (gebautes Projekt) wird beim Datei-Einlesen komplett ignoriert, um den Speicher zu schonen.
+
+Genauer Adito Projektstruktur:
+
+Wichtige Ordner die im Root liegen:
+entity => darin liegen alle .aod Dateien zu den Entitäten
+neonContext => darin liegen die Kontext .aod Dateien zu den Kontexten
+neonView => darin liegen alle erstellten views in dem projekt (Hinweis, jede erstellte View muss im Namen einzigartig sein)
+node_modules => npm install zielordner mit nodejs und den adito modulen
+process => Custom libraries werden hier gespeichert
+modification => Hier werden Modifizierungen gespeichert
+
+Wichtiger Hinweis:
+Wenn man in einem nicht modularisierten Projekt arbeitet, sind die eben gelisteten Ordner genau die Ordner, wo alle Dateien
+wie die Entitäten und Kontexte zum Beispiel abgelegt werden. Das heißt, dass man früher eine Art Basic-Base Template von ADITO
+erhalten hat, wo dutzende Entitäten/Kontexte/Views/Libraries und so von Adito bereits vorerstellt wurden, damit eine Art Template
+Projekt hat in dem schon ein ganzes CRM System enthalten ist.
+
+Seit der Modularisierung, wurden allerdings diese ganzen Entitäten in Module aufgeteilt, sodass man nicht mehr gezwungen ist, dass ganze
+Template Projekt nutzen zu müssen, sondern selektiv aussuchen kann, was man braucht. In der Projektstruktur hat sich dass allerdings jetzt
+so geändert, dass die ebens erwähnten Ordner vor dem Beginn des customizing, nicht mehr genutzt werden von Adito selbst.
+Der Weg ist es via der package.json ein Modul zu importierten, und das importierte Modul landent dann im Ordner:
+{RootOrdner}\node_modules\@aditosoftware\ModulName
+
+In diesen ModulOrnder sieht dann die Ordnerstruktur genauso aus wie obens bereits beschrieben und so funktioniert es auch:
+Für jedes Modul hat Adito ein eigenes isoliertes Projekt vom Typ Modul erstellt, dieses hochgeladen und wir können es via npm
+importieren. Daher sollte es auch keine große Hürde sein, einmal eine Projekt Interpretation zu schreiben und dass dann auch auf die Module anzuwenden.
+
+So sieht die package.json aus von einem Projekt:
+
+{
+    "name": "@3hills-IT/HermesArzneimittel",
+    "version": "2.0.0-RC1",
+    "adito": {
+        "type": "project"
+    },
+    "engines": {
+        "adito": ">=2025.1.3 <2026.0.0"
+    },
+    "dependencies": {
+        "@aditosoftware/sharedalias": "^3.0.0",
+        "@aditosoftware/utility": "^4.1.1",
+        "@aditosoftware/contact": "^5.1.2"
+    },
+    "devDependencies": {
+        "@aditosoftware/devtools": "^2.0.0",
+        "@aditosoftware/eslint-config-adito": "^5.1.1",
+        "@aditosoftware/jdito-types": ">=2025.0.0-RC <2025.1.0",
+        "mariadb": "2.5.5",
+        "compressing": "1.5.1",
+        "urllib": "2.38.0",
+        "liquibase": "4.4.0"
+    },
+    "scripts": {
+        "Create Liquibase Properties (Data)": "serverconfig2LiquibaseProperties4Data",
+        "Create Liquibase Properties (System)": "serverconfig2LiquibaseProperties4System",
+        "eslint all": "npx eslint --fix",
+        "gen. jsconfig": "node ./node_modules/@aditosoftware/devtools/out/src/writeJsConfig.js",
+        "startMariaDB": "node ./scripts/mariaDB.js",
+        "postinstall": "node ./scripts/dev/genDependencyChangelog.js",
+        "Compile genDependencyChangelog.js": "tsc ./scripts/dev/genDependencyChangelog.ts --resolveJsonModule"
+    }
+}
+
+So sieht die package.json von einem Modul aus:
+{
+    "name": "@aditosoftware/contact",
+    "version": "5.2.0",
+    "adito": {
+        "type": "module"
+    },
+    "overrides": {
+    },
+    "peerDependencies": {
+        "@aditosoftware/attribute": "^3.0.0 || ^4.0.0 || ^5.0.0",
+        "@aditosoftware/document": "^4.0.0",
+        "@aditosoftware/keyword": "^3.0.0",
+        "@aditosoftware/loghistory": "^4.0.0",        
+        "@aditosoftware/root": "^8.0.0 || ^9.0.0",
+        "@aditosoftware/utility": "^2.1.0 || ^3.0.0 || ^4.0.0 || ^5.0.0",
+        "@aditosoftware/workflow": "^3.0.0 || ^4.0.0 || ^5.0.0",
+        "@aditosoftware/event-handler": "^3.0.0",
+        "@aditosoftware/language": "^3.0.0",
+        "@aditosoftware/usermanagement": "^3.0.0 || ^4.0.0 || ^5.0.0",
+        "@aditosoftware/favorite": "^3.0.0",
+        "@aditosoftware/observation": "^3.0.0 || ^4.0.0",
+        "@aditosoftware/sharedalias": "^3.0.0",
+        "@aditosoftware/appointment": "^4.0.0",
+
+        "@aditosoftware/salutation": "^2.0.0",
+        "@aditosoftware/object-tree": "^3.0.0 || ^4.0.0"
+
+    },
+    "devDependencies": {
+        "@aditosoftware/devtools": "^2.0.0",
+        "@aditosoftware/eslint-config-adito": "^6.0.0",
+        "@aditosoftware/jdito-types": ">=2024.0.2-RC <2024.0.3",
+        "liquibase": "4.4.0",
+        "typescript": "~5.0.0"
+    },
+    "scripts": {
+        "eslint all": "npx eslint \"**/*.js\" --ignore-pattern node_modules/ --fix"
+    }
+}
+
+Daran kannst du dich ganz leicht orientieren und auslesen was ein Modul ist.
+
+Jetzt kommen wir zu den Modifikationen:
+Damit ein Modul auch von anderen Modulen oder von uns customized werden kann, hat Adito die Modifications erfunden.
+Daher gibt es in jedem Modul, und auch in unserem root diesen Ordner: modification
+Hier werden modular modification dateien erstellt, die genau beschreiben was für Modifikation ein Entwickler an einem Modul
+vorgenommen hat. Das können MODIFY, INSERT, DELETE Operationen sein, die originale Feld Werte überschreiben, löschen oder hinzufügen.
+Für jede einzelne Änderung wird ein eigener neuer Ordner in den modifications erstellt mit jeweils einer .aod datei.
+Für das Hinzufügen von neuen Elementen, nutzt Adito hier ExtensionPoints. Unter diesen ExtensionPoints können ALLE/Module neue Felder usw. hinzufügen.
+
+Der Designer tut beim Transpile dann diese alle zusammenfügen zu einer finalen .aod XML-Datei die das ganze Datenmodell von einer Entität beschreibt.
+Die transpilierten dateien landen dann im dist Ordner (den ignorieren wir aber, den wollen wir nicht lesen)
+
+Als Überleitung:
+Generell bau das gesame Adito System auf einem Objektbaum .aod Meta-Modell auf. Alles im Projekt wird mit .aod Dateien beschrieben,
+die wiederum immer eine XML-Struktur beinhalten. Das heißt dann eig. dass es zu fast jedem Objekt (sei es Entität, Kontext usw.) eine .aod
+Datei existiert, in denen Meta Informationen zu den Objekten stehen.
+
+Hier ist ein kurzes Beispiel mit möglichst vielen Beispielen von einer sehr simplen kleinen Entität, damit du siehst wie die .aod Datei von einer Entität aussieht:
+Hier ist der Inhalt von einer Entity.aod
+<?xml version="1.0" encoding="UTF-8"?><entity xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.4.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/entity/1.4.0"><name>Kontakt_entity</name><title>Appoint,ment</title><majorModelMode>DISTRIBUTED</majorModelMode><icon>VAADIN:USER</icon><color>brand-color</color><useFavorites v="true" /><iconId>NEON:CAKE_SLICE</iconId><image>NEON:BLOCKED</image><usePermissions v="true" /><recordsRecipeSupported v="true" /><titlePlural>Appointments</titlePlural><recordContainer>db</recordContainer><entityFields><entityProvider><name>#PROVIDER</name></entityProvider><entityProvider><name>#PROVIDER_AGGREGATES</name><useAggregates v="true" /></entityProvider><entityField><name>KONTAKTID</name><title>UID</title></entityField><entityField><name>VORNAME</name><title>Vorname</title><linkedContext>Kontakt</linkedContext></entityField><entityField><name>GESCHLECHT</name><title>Geschlecht</title><consumer>KeywordGenders</consumer></entityField><entityField><name>GEBURTSDATUM</name><title>Geburtsdatum</title><contentType>DATE</contentType><resolution>DAY</resolution></entityField><entityField><name>NACHNAME</name><title>Nachname</title></entityField><entityConsumer><name>KeywordGenders</name><dependency><name>dependency</name><entityName>KeywordEntry_entity</entityName><fieldName>SpecificContainerKeywords</fieldName></dependency><children><entityParameter><name>ContainerName_param</name><valueProcess>%aditoprj%/entity/Kontakt_entity/entityfields/keywordgenders/children/containername_param/valueProcess.js</valueProcess><expose v="false" /></entityParameter></children></entityConsumer><entityParameter><name>KontaktId_param</name><expose v="true" /><mandatory v="true" /></entityParameter><entityParameter><name>OnlyActive_param</name></entityParameter><entityProvider><name>Kontakte</name></entityProvider><entityActionField><name>newAppointment</name><title>Contact_New appointment</title><onActionProcess>%aditoprj%/entity/Kontakt_entity/entityfields/newappointment/onActionProcess.js</onActionProcess><iconId>VAADIN:CALENDAR</iconId><state>EDITABLE</state><stateProcess>%aditoprj%/entity/Kontakt_entity/entityfields/newappointment/stateProcess.js</stateProcess><tooltip>Contact_New Appointment</tooltip></entityActionField><entityActionGroup><name>filterViewActionGroup</name><documentation>%aditoprj%/entity/Kontakt_entity/entityfields/filterviewactiongroup/documentation.adoc</documentation><title>Contact_Serial Actions</title><iconId>NEON:GROUP_APPOINTMENT</iconId><children><entityActionField><name>export</name><title>Contact_Export</title><onActionProcess>%aditoprj%/entity/Kontakt_entity/entityfields/filterviewactiongroup/children/export/onActionProcess.js</onActionProcess><isObjectAction v="false" /><selectionType>MULTI</selectionType><iconId>NEON:EXPORT</iconId><stateProcess>%aditoprj%/entity/Kontakt_entity/entityfields/filterviewactiongroup/children/export/stateProcess.js</stateProcess><tooltip>Contact_Export fields of this table</tooltip></entityActionField><entityActionField><name>addAttributeToSelection</name><title>Contact_Set attribute</title><onActionProcess>%aditoprj%/entity/Kontakt_entity/entityfields/filterviewactiongroup/children/addattributetoselection/onActionProcess.js</onActionProcess><isObjectAction v="false" /><selectionType>MULTI</selectionType><iconId>VAADIN:TAGS</iconId></entityActionField></children></entityActionGroup><entityServiceDefinition><name>afterSave_service</name><implementations><serviceImplementation><name>impl1_impl</name><process>%aditoprj%/entity/Kontakt_entity/entityfields/aftersave_service/implementations/impl1_impl/process.js</process></serviceImplementation><serviceImplementation><name>impl2_impl</name><process>%aditoprj%/entity/Kontakt_entity/entityfields/aftersave_service/implementations/impl2_impl/process.js</process></serviceImplementation></implementations></entityServiceDefinition><entityFieldExtensionPoint><name>FieldExtensionPoint</name><implementations><entityField><name>ENGINE</name><consumer>EngineKeywords</consumer></entityField></implementations></entityFieldExtensionPoint><entityParameterExtensionPoint><name>ParameterExtensionPoint</name><implementations><entityParameter><name>filterByEngine_param</name><expose v="true" /></entityParameter></implementations></entityParameterExtensionPoint><entityProviderExtensionPoint><name>ProviderExtensionPoint</name><implementations><entityProvider><name>KontaktEngineProviders</name><titlePlural>Engines #1</titlePlural></entityProvider></implementations></entityProviderExtensionPoint><entityConsumerExtensionPoint><name>ConsumerExtensionPoint</name><implementations><entityConsumer><name>EngineKeywords</name><dependency><name>dependency</name><entityName>Kontakt_entity</entityName><fieldName>KontaktEngineProviders</fieldName></dependency></entityConsumer></implementations></entityConsumerExtensionPoint><entityActionFieldExtensionPoint><name>ActionFieldExtensionPoint</name><implementations><entityActionField><name>createEngine</name><title>Engine erstellen</title></entityActionField></implementations></entityActionFieldExtensionPoint></entityFields><recordContainers><dbRecordContainer><name>db</name><alias>Data_alias</alias><title>Datenbank Container</title><recordFieldMappings><dbRecordFieldMapping><name>GEBURTSDATUM.value</name><recordfield>PERSON.DATEOFBIRTH</recordfield></dbRecordFieldMapping><dbRecordFieldMapping><name>GESCHLECHT.value</name><recordfield>PERSON.GENDER</recordfield></dbRecordFieldMapping><dbRecordFieldMapping><name>KONTAKTID.value</name><recordfield>PERSON.PERSONID</recordfield></dbRecordFieldMapping><dbRecordFieldMapping><name>NACHNAME.value</name><recordfield>PERSON.LASTNAME</recordfield></dbRecordFieldMapping><dbRecordFieldMapping><name>VORNAME.value</name><recordfield>PERSON.FIRSTNAME</recordfield></dbRecordFieldMapping><dbRecordFieldMapping><name>GESCHLECHT.displayValue</name><expression>%aditoprj%/entity/Kontakt_entity/recordcontainers/db/recordfieldmappings/geschlecht.displayvalue/expression.js</expression></dbRecordFieldMapping></recordFieldMappings><linkInformation><linkInformation><name>PERSON</name><tableName>PERSON</tableName><primaryKey>PERSONID</primaryKey><isUIDTable v="true" /><readonly v="false" /></linkInformation></linkInformation></dbRecordContainer></recordContainers></entity>
+
+Und hier ist ein Beispiel wie eine Modifikation aussieht:
+Was wurde modifiziert: Es wurde ein neues Feld in einem ExtensionPoint hinzugefügt.
+Pfad: {Projekt}\modification\Person_enti-implementat-834e590b-aa
+Typ: INSERT
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><modification xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/modification/1.2.0"><name>Person_enti-implementat-834e590b-aa</name><majorModelMode>DISTRIBUTED</majorModelMode><changeType>INSERT</changeType><position v="1775669621" /><modelType>entity</modelType><modelName>Person_entity</modelName><path>Person_entity/entityFields/FieldExtensionPoint/implementations</path><value><modelValueWrapper><name>value</name><value><entityField><name>ENGINE</name><valueProcess>%aditoprj%/modification/Person_enti-implementat-834e590b-aa/valueProcess.js</valueProcess></entityField></value></modelValueWrapper></value></modification>
+valuesProcess.js => Liegt im selben Ordner wie die .aod Datei
+
+Hier noch ein Beispiel:
+Was wurde modifiziert: Es wurde der Parameter Prozess von einem Consumer überschrieben
+Pfad: {Projekt}\modification\Person_enti-valueProces-50da6d62-39
+Typ: MODIFY
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><modification xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/modification/1.2.0"><name>Person_enti-valueProces-50da6d62-39</name><majorModelMode>DISTRIBUTED</majorModelMode><changeType>MODIFY</changeType><position v="1775669766" /><modelType>entity</modelType><modelName>Person_entity</modelName><path>Person_entity/entityFields/Communications/children/ContactsMainCountry_param/valueProcess</path><value><stringValueWrapper><name>value</name><value>%aditoprj%/modification/Person_enti-valueProces-50da6d62-39/valueProcess.js</value></stringValueWrapper></value></modification>
+
+Hier noch ein Beispiel:
+Was wurde modifiziert: Es wurde ein Feld von einem ExtensionPoint aus einem anderen Modul gelöscht
+Pfad: {Projekt}\modification\Address_ent-AddressSear-6f766d94-86
+Typ: DELETE
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><modification xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/modification/1.2.0"><name>Address_ent-AddressSear-6f766d94-86</name><majorModelMode>DISTRIBUTED</majorModelMode><changeType>DELETE</changeType><position v="1775670109" /><modelType>entity</modelType><modelName>Address_entity</modelName><path>Address_entity/entityFields/FieldExtensionPoint/implementations/AddressSearch</path></modification>
+
+Hier ist der XML Inhalt von einer Context.aod:
+<?xml version="1.0" encoding="UTF-8"?><neonContext xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/neonContext/1.2.0"><name>Kontakt</name><title>Appointment</title><majorModelMode>DISTRIBUTED</majorModelMode><mainView>KontaktMain_view</mainView><filterView>KontaktFilter_view</filterView><editView>KontaktEdit_view</editView><previewView>KontaktPreview_view</previewView><entity>Kontakt_entity</entity><references><neonViewReference><name>915447e4-1b9d-40b6-a8ce-831ab35d4923</name><view>KontaktFilter_view</view></neonViewReference><neonViewReference><name>e850da32-3303-4dbb-acbf-a151bbde2588</name><view>KontaktEdit_view</view></neonViewReference><neonViewReference><name>9cb0c71f-51bf-4423-bbda-df2d865d1536</name><view>KontaktPreview_view</view></neonViewReference><neonViewReference><name>f818bdac-c941-4ccc-a16f-de90df675682</name><view>KontaktMain_view</view></neonViewReference></references></neonContext>
+
+Libraries:
+Custom Javascript Bibliotheken werden im Root Ordner unter process gespeichert. Für jede library entsteht hier ein Ordner mit dem Namen der Library Datei
+In dem Ordner ist dann eine .aod und eine process.js mit dem javascript code.
+.aod Inhalt: <?xml version="1.0" encoding="UTF-8"?><process xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.3.0" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/process/1.3.0"><name>Engine_lib</name><majorModelMode>DISTRIBUTED</majorModelMode><process>%aditoprj%/process/Engine_lib/process.js</process><alias>Data_alias</alias><variants><element>LIBRARY</element></variants></process>
+
+Views:
+Die Views in Adito beschreiben die Masken auf der Oberfläche mit denen der User interagiert. Jede View im Projekt muss im Namen einzigartig sein (über die Entitäten hinaus sogar)
+Für Jede View wird im Ordner neonView eine Ordner mit dem Namen der View erstellt.
+
+Beispiel für die EditMaske:
+KontaktEdit_view.aod
+Nutzen: Öffnet die große Bearbeitungmaske wenn man am Datensatz den Bearbeitungsstift drückt
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><neonView xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.3" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/neonView/1.2.3"><name>KontaktEdit_view</name><majorModelMode>DISTRIBUTED</majorModelMode><layout><noneLayout /></layout><children><genericViewTemplate><name>GenericCustomName</name><editMode v="true" /><showDrawer v="true" /><drawerCaption>Caption</drawerCaption><fixedDrawer v="true" /><hideLabels v="true" /><hideEmptyFields v="false" /><isEditable v="true" /><isLabelPositionTop v="true" /><informationField>#CONTENTDESCRIPTION</informationField><title>Custom View Title</title><fields><entityFieldLink><name>6d62543e-0e1c-4659-8593-4f9b48846505</name><entityField>VORNAME</entityField></entityFieldLink><entityFieldLink><name>7c473293-2db5-4ef9-b97e-2fff8bfb5c36</name><entityField>NACHNAME</entityField></entityFieldLink><entityFieldLink><name>4c0df8a1-4c84-427f-84b3-b2635f5299c4</name><entityField>GESCHLECHT</entityField></entityFieldLink><entityFieldLink><name>d1d206c7-e998-4b4e-85f4-4afcdf801697</name><entityField>ENGINE</entityField></entityFieldLink></fields></genericViewTemplate></children></neonView>
+
+Anderes Beispiel für die FilterAnsicht:
+Nutzen: Ist die standard Tabellenansicht wenn man einen Kontext öffnet
+KontaktFilter_view.aod
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><neonView xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.3" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/neonView/1.2.3"><name>KontaktFilter_view</name><majorModelMode>DISTRIBUTED</majorModelMode><layout><noneLayout /></layout><children><tableViewTemplate><name>FilterTable</name><hideActions v="true" /><hideContentSearch v="false" /><inlineEdit v="true" /><entryAction>addAttributeToSelection</entryAction><iconField>#ICON</iconField><titleField>#TITLE</titleField><subtitleField>#ENTITYNAME</subtitleField><descriptionField>#CONTENTDESCRIPTION</descriptionField><hideColumnSelector v="true" /><autoNewRow v="false" /><linkedColumns><element>NACHNAME</element></linkedColumns><hideHeader v="true" /><isSaveable v="true" /><informationField>#CONTENTDESCRIPTION</informationField><favoriteActionGroup1>filterViewActionGroup</favoriteActionGroup1><initialVisibleColumns><element>GEBURTSDATUM</element><element>GESCHLECHT</element><element>NACHNAME</element><element>VORNAME</element></initialVisibleColumns><isCreatable v="false" /><isDeletable v="false" /><isEditable v="false" /><columns><neonTableColumn><name>367e124c-36e9-4e5a-a970-a0ae39b76319</name><entityField>VORNAME</entityField></neonTableColumn><neonTableColumn><name>013263ea-94ee-4f59-a54b-5becc7e27398</name><entityField>NACHNAME</entityField></neonTableColumn><neonTableColumn><name>d430e390-46e8-43e3-a550-901be9479589</name><entityField>GEBURTSDATUM</entityField></neonTableColumn><neonTableColumn><name>0463d851-a422-489d-96de-e6dec065b90a</name><entityField>GESCHLECHT</entityField></neonTableColumn></columns></tableViewTemplate></children></neonView>
+
+MainView Beispiel für die MainAnsicht:
+Nutzen: Ansicht wenn man den Datensatz öffnet
+KontaktMain_view.aod
+Inhalt: <?xml version="1.0" encoding="UTF-8"?><neonView xmlns="http://www.adito.de/2018/ao/Model" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" VERSION="1.2.3" xsi:schemaLocation="http://www.adito.de/2018/ao/Model adito://models/xsd/neonView/1.2.3"><name>KontaktMain_view</name><majorModelMode>DISTRIBUTED</majorModelMode><layout><headerFooterLayout><header>f74f6224-77eb-4b7a-a674-8ce8cde79072</header></headerFooterLayout></layout><children><neonViewReference><name>f74f6224-77eb-4b7a-a674-8ce8cde79072</name><entityField>#ENTITY</entityField><view>KontaktPreview_view</view></neonViewReference><neonViewReference><name>c43c2112-9e5a-4bf5-b7fb-bed535a17746</name><entityField>Addresses</entityField><view>AdressFilter_view</view></neonViewReference></children></neonView>
+
+Pro Kontext kann man folgende addressierte Standard-Views setzen (die werden in der Context.aod gespeichert):
+mainView
+filterView
+editView
+previewView
+previewMultipleView
+lookupView
+
+Hinweise:
+In Adito gibt es dutzende Werte für Felder/Consumer/Provider usw.
+Adito definiert für ein paar Konfigurationen Standard-Werte, die nicht in den .aod Dateien vermerkt werden, da Adito diese als Standard interpretiert.
+Auf die müssen wir achten und trotzdem in der Diff-Ansicht anzeigen (auch wenn sie leer sind, sollten die properties davon bitte immer rendern)
+Default werte werden eben in den .aod dateien nicht vermerkt, dass heißt wenn sie noch vorhanden ist, aber einen standardwert hat, dann musst du den richtig anzeigen.
+
+Booleans sind false, außer ich schreibs dazu. Alles andere ist auch leer, außer ich schreibs dazu
+In Klammer schreibe ich dir dazu, wenn es sich bei der Property um einen Prozess handelt, den du dann suchen musst wenn es ihn gibt.
+Bzw. werde ich dir in Klammer auch dazu schreiben wenn es ein boolean Feld ist.
+
+Viele Elemente teilen sich dieselben Enums, Properties usw. die werde ich nicht doppelt beschreiben wenn sie schonmal vorkamen
+Manche Properties sind gruppiert, ich werde das mit einem Hashtag kennzeichnen.
+Also #Userhelp => Userhelp. Ist Expandable/Collapsable
+Oder nur # => Hat keinen Titel
+
+Kontext Properties:
+#
+title
+devices=MOBILE|TABLET|DESKTOP (Enum Flags)
+description
+documentation
+comment
+icon
+iconProcess
+#Entity
+entity
+#Views
+viewmodeProvider
+mainView
+filterView
+editView
+previewView
+previewMultipleView
+lookupView
+
+Entity-Properties:
+#
+title
+titlePlural
+descriptionField
+documentation
+comment
+icon
+iconProcess (Prozess)
+metadata
+useFavourites (Boolean)
+recordRecipeSupported (Boolean)
+#Source
+recordContainer
+#Processes
+onInit (Prozess)
+afterUIiInit (Prozess)
+beforeOperatingState (Prozess)
+afterOperatingState (Prozess)
+onValidation (Prozess)
+afterSave (Prozess)
+initFilterProcess (Prozess)
+contentTitleProcess (Prozess)
+contentDescriptionProcess (Prozess)
+#Processes grants
+usePermissions (Boolean)
+grantCreate=true (Boolean)
+grantCreateProcess (Prozess)
+grantUpdate=true (Boolean)
+grantUpdateProcess (Prozess)
+grantDelete=true (Boolean)
+grantDeleteProcess (Prozess)
+#Color
+color
+colorProcess (Prozess)
+#Icon
+image
+imageProcess (Prozess)
+iconId
+iconIdProcess (Prozess)
+
+Feld Properties:
+#
+name
+title
+titleProcess (Prozess)
+descriptionField
+documentation
+#Database
+linkedContext
+linkedContextProcess (Prozess)
+consumer
+#Tool tip
+tooltip
+tooltipProcess (Prozess)
+#Placeholder
+placeholder
+placeholderProcess (Prozess)
+#Processes
+valueProcess (Prozess)
+displayValueProcess (Prozess)
+onValidation (Prozess)
+onValueChange (Prozess)
+onValueChangeTypes=MASK|PROCESS|PROCESS_SETVALUE (Funktioniert wie ein Enum mit Flags)
+compareChangesWithRecordField (Boolean)
+#value list
+dropDownProcess
+textInputAllowed (Boolean)
+#Processing grants
+usePermissions (Boolean)
+#Color
+color
+colorProcess (Prozess)
+#Activity
+state=AUTO (Enum)
+stateProcess (Prozess)
+#Required field
+mandatory (Boolean)
+mandatoryProcess (Prozess)
+#single selection
+selectionMode=SINGLE (Enum)
+selectionModeProcess (Prozess)
+#Search
+groupable (Boolean)
+preferredGroupOrder=DISPLAYVALUE (Enum)
+#Content Type
+contentType=TEXT (Enum)
+contentTypeProcess (Prozess)
+#Formatting
+maxFieldSize=<unlimited> (steht nur als placeholder dort, da kann man int werte eintragen)
+resolution (Enum wenn contentType DATE ausgewählt ist)
+outputFormat
+inputFormat
+
+FieldGroup Properties:
+#
+name
+title
+titleProcess (Prozess)
+description
+documentation
+#Tool tip
+tooltip
+tooltipProcess (Prozess)
+#Processes
+valueProcess (Prozess)
+#Activity
+state
+stateProcess (Prozess)
+#Action
+defaultAction (Prozess)
+
+Parameter Properties:
+#
+name
+description
+documentation
+title
+valueProcess (Prozess)
+expose (Boolean)
+mandatory (Boolean)
+
+Action Properties:
+#
+name
+title
+titleProcess
+description
+documentation
+#Tool tip
+tooltip
+tooltipProcess
+#Processing grants
+usePermissions
+#Activity
+state=EDITABLE
+stateProcess
+#Icon
+iconId
+iconIdProcess
+#Action
+onActionProcess
+shortcut
+isMenuAction=true (Boolean)
+isObjectAction=true (Boolean)
+selectionType=UNBOUND (Enum)
+isSaveAction (deprecated) (Boolean)
+
+ActionGroup Properties:
+#
+name
+title
+titleProcess
+description
+documentation
+#Tool tip
+tooltip
+tooltipProcess
+#Activity
+state
+stateProcess
+#Icon
+iconId
+iconIdProcess
+
+Consumer Properties:
+#
+title
+description
+documentation
+entityName
+fieldName
+refreshParent (Boolean)
+isOneToOneRelationship (Boolean)
+#Processes
+onValidation
+externalInitFilterProcess
+#Activity
+state=EDITABLE
+stateProcess
+#single selection
+selectionMode=SINGLE
+selectionModeProcess
+
+Consumer Parameter Properties:
+#
+Parameter müssen zumal erst initialisiert werden, sonst sieht man keine properties. bzw. dann wird der parame einfach ignoriert.
+name
+description
+documentation
+title
+valueProcess
+expose=true (Boolean)
+mandatory
+
+Provider Properties:
+#
+name
+titlePlural
+titlePluralProcess
+description
+documentation
+dependencies
+lookupIdfield
+uniqueProviderKeyProcess (Prozess)
+#Source
+recordcontainer
+targetContextField
+targetIdField
+targetConsumerProcess
+useAggregates (Boolean)
+sortingField
+#Processing grants
+usePermissions
+#Search
+filterVariablesProcess
+initFilterMergeMode=AND
+
+Service Properties:
+documentation
+
+Service implementation properties:
+process
+
+Recordcontainer (hier gibt es 4 Varianten):
+Variant 1 - dbRecordContainer
+#
+title
+type=dbRecordContainer
+description
+documentation
+#Database
+alias
+linkInformation
+maximumDbRows
+isPageable=true (Boolean)
+isReadOnly (Boolean)
+isRequireContainerFiltering (Boolean)
+hasDependentRecords (Boolean)
+fromClauseProcess (Prozess)
+conditionProcess (Prozess)
+orderClauseProcess (Prozess)
+onDBInsert (Prozess)
+onDBUpdate (Prozess)
+onDBDelete (Prozess)
+
+Variant 2 - datalessRecordContainer
+#
+title
+type=datalessRecordContainer
+description
+documentation
+#Database
+alias
+
+Variant 3 - IndexRecordContainer
+#
+title
+type=indexRecordContainer
+description
+documentation
+#Indexsearch
+indexFieldMappings=#UID|#TITLE|#DESCRIPTION
+configMode=READ_ONLY (Enum)
+patternExtensionProcess (Prozess)
+boostPatternProcess (Prozess)
+#Search
+searchIndexGroups (nur zu sehen wenn configMode=READONLY)
+
+Nur angezeigt wenn configMode =INDEXGROUP_DEFINITION ist:
+isActive=true
+isGlobal=true
+indexRecordAlias
+
+Variant 4 - jdito
+#
+title
+type=jDitoRecordContainer
+description
+documentation
+#JDito
+jDitoRecordAlias
+recordFieldMappings
+aggregateFieldMappings
+isPageable (Boolean)
+supportsFilterExtensionGrouping (Boolean) (nur zu sehen wenn isPageable=false)
+isFilterable (Boolean)
+isGroupable (Boolean)
+isRequireContainerFiltering (Boolean)
+isSortable (Boolean)
+contentProcess (Prozess)
+rowCountProcess (Prozess)
+hasDependentRecords (Boolean)
+onInsert (Prozess)
+onUpdate (Prozess)
+onDelete (Prozess)
+#Cache
+cacheType
+cacheKeyProcess
+
+Fieldmappings im dbRecordContainer. In den Fieldmappings werden generell nochmal ALLE Fields und Consumer angezeigt.
+Für Felder gibt es jeweils fieldName.value und fieldName.displayValue. Für Consumer gibt es nur 1 Eintrag.
+Standardmäßig sind diese nicht initialisert, dass heißt sie sind nicht aktiv und ausgegraut. 
+In den FieldMappings konfiguriert man nämlich den direkten Datenbank anschluss. Entweder 1:1 mit einem Column
+aus einer Tabelle die in LinkInformationen hinterlegt wurde, oder in eine Expression wo man ein SQL als result zurückgibt.
+Für jedes Feld muss .value und .displayValue seperat initalisert werden.
+
+Field Mapping Properties für .value und .displayValue:
+#
+entityField=fieldName.value (oder .displayValue)
+type=dbRecordFieldMapping
+recordfield
+expression (Prozess)
+columnAlias
+#Search
+isFilterable (Boolean)
+isLookupFilter (Boolean)
+maxFieldSize=<unlimited> (nicht vorhanden beim displayValue)
+
+Field Mapping für Consumer:
+#
+type=consumerMapping
+filterConditionProcess
+#Search
+filtertype
+isFilterable (Boolean)
+isLookupFilter (Boolean)
+
+Filter Extension Properties:
+#
+type=filterExtension
+documentation
+title
+isFilterable=true
+contentType
+useConsumer (Boolean)
+consumer (Nur sichtbar wenn useConsumer=True)
+filterValuesProcess (Prozess)
+filterConditionProcess  (Prozess)
+groupedRecordField
+titleRecordField
+isGroupable (Boolean)
+groupQueryProcess (Prozess)
+#Search
+filtertype=EXTENDED (Enum)
+isLookupfilter (Boolean)
+
+Filter ExtensionSet Properties:
+#
+type=filterExtensionSet
+documentation
+filterFieldsProcess (Prozess)
+isFilterable=true
+filterValuesProcess
+filterConditionProcess (Prozess)
+isGroupable
+groupQueryProcess (Prozess)
+#Search
+filtertype=EXTENDED
+isLookupFilter
+
+View:
+#
+title
+type=neonView
+description
+documentation
+icon
+iconProcess
+quickEntry
+filterable
+size=NORMAL (Enum)
+isOverlay (Boolean)
+#Others
+layout=NoneLayout
+
+Alle View Templates:
+Alle templates teilen sich folgende Properties: (die kommen immer zuerst in der property liste und ich werde sie hier nur einmal auflisten und da es auch sehr viele Templates gibt, werde ich nur die wichtigsten die properties listen)
+#
+title
+devices=MOBILE|TABLET|DESKTOP
+type=Da steht immer der Template typ drinnen
+#Entity
+entityField=#ENTITY
+
+-actionListViewTemplate
+#Fields
+titleField
+descriptionField
+iconField
+entryAction
+
+-actionViewTemplate
+#Actions
+actions
+
+-cardViewTemplate
+#Renderer Mapping
+viewRendererMapping
+editRendererMapping
+#Fields
+iconField
+titleField
+subtitleField
+descriptionField
+informationField
+#Favourite Fields
+objectType=#CONTEXTNAME
+rowId=#UID
+#Actions
+favouriteAction1
+favouriteAction2
+#Others
+isEditable=true (Boolean)
+
+-dragAndDropViewTemplate
+#Fields
+descriptionField
+#Actions
+dropAction
+
+-dynamicFormViewTemplate
+#Fields
+formDefintion
+formResult
+#Others
+editMode=false (Boolean)
+
+-dynamicMultiDataChartViewTemplate
+#Entity
+columns
+#Fields
+informationField
+defaultGroupFields
+#Others
+chartType
+showDataLabelValues=false (Boolean)
+yAxisLabel
+shareParent=true (Boolean)
+stacked
+maxDBRow=400
+
+-favouriteViewTemplate
+objectType=#CONTEXTNAME
+rowId=#UID
+
+-ganttViewTemplate
+#Entity
+columns
+#Fields
+uidField
+titleField
+descriptionField
+beginDateField
+endDateField
+predecessorIdField
+isSubstep
+stepColorField
+stepProgress
+initialStartDateField
+initialEndDateField
+#Actions
+favouriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+#Others
+groupByRootElements=false (Boolean)
+isCreatable=false (Boolean)
+isEditable=true (Boolean)
+hideArrows=false (Boolean)
+isDeletable=true (Boolean)
+
+-genericViewTemplate
+#Entity
+fields
+#Renderer Mapping
+viewRendererMapping
+editRendererMapping
+#Fields
+informationField
+#UI
+isLabelPositionTop=false (Boolean)
+textAlignment=LEFT (Enum)
+#Others
+isEditable=true (Boolean)
+editMode=false (Boolean)
+showDrawer=false (Boolean)
+drawerCaption=
+fixedDrawer=false (Boolean)
+hideLabels=false (Boolean)
+hideEmptyFields=true (Boolean)
+
+-genericMultipleViewTemplate
+#Entity
+columns
+#Renderer Mapping
+viewRendererMapping
+editRendererMapping
+#Fields
+informationField
+#Others
+isCreatable=true (Boolean)
+isEditable=true (Boolean)
+isDeletable=true (Boolean)
+autoNewRow=true (Boolean)
+maxDBRow=400
+
+-lookupViewTemplate
+#Fields
+consumerField
+#Others
+consumerPresentationMode=POPUP (Enum)
+
+-pictureViewTemplate
+#Fields
+pictureField
+#Actions
+pictureClickAction
+
+-resourceTimelineViewTemplate
+devices=DESKTOP
+#Actions
+favoriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+#Others
+maxDBRow
+entryMaxDBRow
+hideContentSearch=false (Boolean)
+#Resources
+titleField=#CONTENTTITLE
+colorField
+initalDateField
+parentField
+businessHoursField
+useUserTimeSlot=true (Boolean)
+#Entries
+entryEntityField
+entryTitleField=#CONTENTTITLE
+entryResourceIdField
+entryDatetimeStartField
+entryDatetimeEndField
+entryColorField
+entrySelectedResourcesField
+entryResourceOperationIdField
+
+-scoreCardViewTemplate
+#Entity
+fields
+#Actions
+fieldActions
+
+-stepperViewTemplate
+#Fields
+stateField
+titleField
+iconField
+#Others
+maxDBRow
+
+-tableViewTemplate
+#Entity
+columns
+initialVisibleColumns
+linkedColumns
+#Renderer Mappings
+viewRendererMapping
+editRendererMapping
+#Fields
+iconField
+titleField
+informationField
+subtitleField
+descriptionField
+fixedFilterFields
+#Actions
+favouriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+entryAction
+#UI
+layoutMapping
+#Others
+isCreatable=true (Boolean)
+isEditable (Boolean)
+isDeletable (Boolean)
+isSaveable
+autoNewRow (Boolean)
+linkedFrame
+maxDBRow
+hideActions=false (Boolean)
+hideContentSearch=false (Boolean)
+inlineEdit=false (Boolean)
+hideColumnSelector=false (Boolean)
+hideHeader=false (Boolean)
+
+-timelineViewTemplate
+#Fields
+dateField
+informationField
+titleField
+descriptionField
+subdescriptionField
+iconIdField
+additionalInfoField
+#Actions
+favouriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+entryAction
+#Others
+isCreatable=true (Boolean)
+isEditable=true (Boolean)
+isDeletable=true (Boolean)
+maxDBRow
+hideActions=false (Boolean)
+hideContentSearch=true (Boolean)
+hideTime=false (Boolean)
+orderByDate=true (Boolean)
+
+#Entity
+columns
+#Renderer Mapping
+viewRendererMapping
+editRendererMapping
+#Fields
+titleField
+highlightingField
+informationField
+#UI
+isLabelPositionTop
+textAlignment=LEFT
+#Others
+isCreatable=true (Boolean)
+isEditable=true (Boolean)
+titleFieldFullWidth=false (Boolean)
+fixedDrawer=false (Boolean)
+rowLimit
+isDeletable=true (Boolean)
+autoNewRow=true (Boolean)
+maxDBRow
+
+-treeViewTemplate
+#Renderer Mappings
+viewRendererMapping
+editRendererMapping
+#Fields
+parentField
+nodeTypeField
+informationField
+titleField
+descriptionField
+iconField
+defaultGroupFields
+fixedFilterFields
+#Actions
+favouriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+entryAction
+#Others
+isCreatable=true (Boolean)
+isEditable=true (Boolean)
+isDeletable=true (Boolean)
+maxDBRow=400
+hideActions=false (Boolean)
+hideContentSearch=true (Boolean)
+showChildrenCount=true (Boolean)
+expandRootItems=false (Boolean)
+useBreadCrumbs=false (Boolean)
+
+-treeTableViewTemplate
+#Entity
+columns
+initialVisibleColumns
+linkedColumns
+#Renderer Mappings
+viewRendererMapping
+editRendererMapping
+#Fields
+parentField
+iconField
+titleField
+subtitleField
+descriptionField
+informationField
+defaultGroupFields
+fixedFilterFields
+#Actions
+favouriteActionGroup1
+favouriteActionGroup2
+favouriteActionGroup3
+entryAction
+#UI
+layoutMapping
+#Others
+isCreatable=true (Boolean)
+isEditable=true (Boolean)
+isDeletable=true (Boolean)
+autoNewRow=true (Boolean)
+maxDBRow=400
+hideActions=false (Boolean)
+hideContentSearch=true (Boolean)
+hideColumnSelector=false (Boolean)
+hideHeader=false (Boolean)
+showChildrenCount=true (Boolean)
+expandRootItems=false (Boolean)
+useBreadCrumbs=false (Boolean)
+
+Hierachie im Designer in der Entity selber:
+Root
+-RecordContainers
+--FilterExtensions => Hier sind alle filterextensions/sets
+--FieldMappings => Alle Fieldmappings
+-Fields => Alle Felder. 
+-Parameters => Alle Parameter
+-Providers => Alle Provider
+-Consumers => Alle Consumer
+--Parameter => Unter jedem Consumer werden alle Parameter aufgelistet (initialisert sind sie weiß, nicht initalisert sind sie grau. Unitialisierte Parameter werden aber nicht in der .aod vermerkt)
+-Actions => Alle Actions
+-Services => Alle Services
+--Implementations => Hier wird jede implementation aufgelistet die zum service gehört
+
+Ordner Adito Hierarchie im Entity (Ordner entity): (Ich werde nicht alle Prozesse auflisten, aber die Prozesse sieht zumeist eh synchron mit dem was ich oben beschrieben habe)
+-entity
+--entityName (als Ordner)
+---entityName.aod
+---entityFields (Ordner)
+---- Hier stehen alle Felder/Consumer/services mit dem Ordernamen wie sie in der entity.aod stehen. Hier stehen auch alle ExtensionPoints drinnen mit dem ExtensionPoint
+Namen als Ordnername.
+{
+Beispiele für Aufbau für verschiedene Elemente:
+Consumer:
+-consumerName (als Ordner)
+-children (Ordner)
+--parameterName (als Ordner)
+---valueProcess.js
+-onValidation.js
+-stateProcess.js
+
+Action:
+-actionName (als Ordner)
+--onActionProcess.js
+--stateProcess.js
+
+Services:
+-serviceName (als Ordner)
+-implementations (Ordner)
+--implementationName (als Ordner)
+---process.js
+-documentation.adoc
+
+Parameter:
+-parameterName (als Ordner)
+--valueProcess.js
+
+Any ExtensionPoint:
+-extensionPointName
+-documentation.adoc
+--implementations
+--entityFieldName (als Ordner)
+---valueProcess.js
+---displayValueProcess.js
+---onValidation.js
+
+
+---recordcontainers (Ordner)
+---- Hier stehen alle konfigurierten recordcontainers auf der Entity (als Ordername)
+-----recordfieldmappings (Ordner)
+------fieldName.value (Ordner)
+-------expression.js
+------fieldName.displayvalue (Ordner)
+-------expression.js
+-----filterextensions (Ordner)
+------ Hier stellen alle erstellten Filterextensions (als Ordername)
+-------filterConditionProcess.js
+-------filterValuesProcess.js
+-------groupQueryProcess.js
+
+}
+
+---afterSave.js
+---afterUiInit.js
+---onValidation.js
+
+Ordner Adito Hierarchie im Context (Ordner neonContext): Hier stehen alle Kontexte in .aod Dateien
+-contextName (als Ordner)
+--contextName.aod
+--documentation.adoc
+--iconProcess.js
+
+Ordner Adito Hierarchie im View (Ordner neonView): Hier stehen alle Views in .aod Dateien
+-viewName (als Ordner)
+--viewName.aod
+--iconProcess.js
+--documentation.adoc
+
+Im Root:
+-package.json
+-serviceDefinition
+--serviceName (als Ordner)
+---serviceName.aod
