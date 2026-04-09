@@ -2,7 +2,7 @@
 <html lang="de" data-bs-theme="dark">
 <head>
 <meta charset="UTF-8">
-<title>ADITO Migrator v1.3</title>
+<title>ADITO Migrator v1.4</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -47,6 +47,16 @@
     .btn-custom:hover { background-color: #9b59b6; color: white; }
     .btn-outline-custom { color: #d2a8ff; border-color: #9b59b6; }
     .btn-outline-custom:hover { background-color: #8e44ad; color: white; }
+
+    /* Template Mode Colors */
+    #tplToggle:checked { background-color: #f85149; border-color: #f85149; }
+    #tplToggle { background-color: var(--bs-dark); border-color: #f85149; }
+    .subtle-diff-border-template { border-left: 3px solid #f85149 !important; }
+    .text-template { color: #f85149 !important; }
+    body.template-mode .bg-warning { background-color: #f85149 !important; }
+    body.template-mode .text-warning { color: #f85149 !important; }
+    body.template-mode .border-warning { border-color: #f85149 !important; }
+    body.template-mode .legend-proc { border-color: #f85149 !important; }
     
     .prop-row { transition: background 0.1s; }
     .prop-row:hover { background: rgba(255,255,255,0.03); }
@@ -60,14 +70,12 @@
     .prop-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; margin-bottom: 15px; }
     .prop-box-header { background: rgba(0,0,0,0.2); border-bottom: 1px solid #30363d; padding: 6px 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #c9d1d9; }
 
-    /* --- Eigene Custom Scrollbars --- */
     ::-webkit-scrollbar { width: 12px; height: 12px; }
     ::-webkit-scrollbar-track { background: #0d1117; border-left: 1px solid #30363d; border-top: 1px solid #30363d; }
     ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 6px; border: 2px solid #0d1117; }
     ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
     ::-webkit-scrollbar-corner { background: #0d1117; }
 
-    /* --- Scroll & Viewport Fixes für Diff2Html --- */
     #diff-view-container { flex: 1; min-height: 0; overflow: hidden; }
     #diff-view-container.d-flex { display: flex !important; }
     #diff-html-target { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
@@ -79,16 +87,16 @@
     .d2h-file-side-diff { flex: 1 1 50%; overflow: auto !important; min-height: 0; position: relative; }
     .d2h-code-wrapper { overflow: visible !important; width: max-content !important; min-width: 100%; height: auto !important; }
     
-    /* Blende Diff2Html Header, Checkboxen, und Tags (wie RENAMED) komplett aus */
     .d2h-file-header, .d2h-file-list-wrapper, .d2h-file-name-wrapper, .d2h-icon, .d2h-tag { display: none !important; }
 </style>
 </head>
 <body>
 
 <header class="d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background: #161b22; border-color: #30363d !important;">
-    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.3</div>
+    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.4</div>
     <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
     <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
+    <button id="btn-f3" class="btn btn-sm btn-outline-secondary text-light ms-1" onclick="document.getElementById('f3').click()"><i class="fa-regular fa-folder"></i> 3. Template (Opt.)</button>
    
     <div class="d-flex align-items-center ms-3">
         <select id="entitySelect" class="form-select form-select-sm w-auto bg-dark text-light" disabled>
@@ -96,21 +104,27 @@
         </select>
         <button class="btn btn-sm btn-primary ms-2" onclick="startAnalysis()" id="btn-analyze" disabled title="Entity analysieren"><i class="fa-solid fa-play"></i></button>
         <button class="btn btn-sm btn-outline-info ms-1 d-none" onclick="reloadEntity()" id="btn-reload" title="Kompletten Reload erzwingen"><i class="fa-solid fa-rotate"></i></button>
+        
+        <div class="form-check form-switch ms-4 mb-0 d-none" id="tpl-toggle-container">
+            <input class="form-check-input shadow-sm" type="checkbox" id="tplToggle" onchange="toggleMode()" style="cursor: pointer;">
+            <label class="form-check-label text-danger fw-bold" for="tplToggle" style="font-size: 13px; cursor: pointer;">Template vs Source</label>
+        </div>
     </div>
 
     <div class="ms-auto d-flex gap-3 text-secondary small align-items-center">
         <span title="Eigene Projekt-Anpassung"><span class="badge badge-custom shadow-sm"><i class="fa-solid fa-wrench"></i> CUSTOM</span></span>
         <span title="Enthält Modifikationen"><i class="fa-solid fa-wrench" style="color: #d2a8ff; opacity: 0.8;"></i> Modifiziert</span>
         <span class="border-start border-secondary h-50 mx-1"></span>
-        <span><div class="status-dot d-inline-block" style="background:#8b949e;"></div> Modular-Only</span>
+        <span><div class="status-dot d-inline-block" style="background:#8b949e;"></div> Modular/Source-Only</span>
         <span><div class="status-dot d-inline-block" style="border:1px solid #30363d; background:transparent;"></div> Gleich</span>
         <span><div class="status-dot bg-danger d-inline-block"></div> Fehlt</span>
         <span><div class="status-dot bg-warning d-inline-block"></div> Geändert</span>
-        <span><div class="status-dot d-inline-block" style="border: 2px solid #d29922; background:transparent;"></div> Prozess-Diff</span>
+        <span><div class="status-dot d-inline-block legend-proc" style="border: 2px solid #d29922; background:transparent;"></div> Prozess-Diff</span>
     </div>
 
     <input type="file" id="f1" nwdirectory hidden>
     <input type="file" id="f2" nwdirectory hidden>
+    <input type="file" id="f3" nwdirectory hidden>
 </header>
 
 <main class="d-flex flex-grow-1 overflow-hidden">
@@ -124,7 +138,7 @@
                 <span class="small text-secondary" id="file-status">Keine Projekte.</span>
             </div>
             <div class="form-check form-switch mb-0 align-self-start ms-1">
-                <input class="form-check-input" type="checkbox" id="ignoreTitleToggle" onchange="renderTree()">
+                <input class="form-check-input" type="checkbox" id="ignoreTitleToggle" onchange="renderTreeStateful()">
                 <label class="form-check-label text-secondary" style="font-size: 11px;" for="ignoreTitleToggle">Ignore 'title' diffs</label>
             </div>
         </div>
@@ -149,8 +163,8 @@
                     <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()" title="Source Pfade ein/ausblenden"><i class="fa-solid fa-bug"></i> Debug</button>
                     <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()" title="Prozess neu laden"><i class="fa-solid fa-rotate"></i></button>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Orig.</button>
-                        <button class="btn btn-outline-secondary" id="copy-btn-2" onclick="copySource(2)"><i class="fa-regular fa-copy"></i> Modul</button>
+                        <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Links</button>
+                        <button class="btn btn-outline-secondary" id="copy-btn-2" onclick="copySource(2)"><i class="fa-regular fa-copy"></i> Rechts</button>
                     </div>
                 </div>
             </div>
@@ -159,12 +173,12 @@
         <div id="debug-banner" class="d-none bg-dark p-2" style="font-size: 11px; border-bottom: 1px solid #b8860b; box-shadow: inset 0 -2px 5px rgba(0,0,0,0.3);">
             <div class="row m-0 w-100">
                 <div class="col-6 d-flex align-items-center border-end border-secondary">
-                    <span class="text-secondary fw-bold me-2">ORIG:</span>
+                    <span class="text-secondary fw-bold me-2">BASE:</span>
                     <span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-orig">...</span>
                     <button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size: 10px;" onclick="copyPath('orig')"><i class="fa-solid fa-copy"></i></button>
                 </div>
                 <div class="col-6 d-flex align-items-center">
-                    <span class="text-secondary fw-bold me-2">MODUL:</span>
+                    <span class="text-secondary fw-bold me-2">TARGET:</span>
                     <span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-mod">...</span>
                     <button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size: 10px;" onclick="copyPath('mod')"><i class="fa-solid fa-copy"></i></button>
                 </div>
@@ -362,28 +376,72 @@ class AditoProject {
     findFile(p) { const s = p.toLowerCase().replace('%aditoprj%/', ''); for(const [k, v] of this.files.entries()) if(k.endsWith(s)) return v; return null; }
 }
 
-let projOrig = null, projMod = null;
-let state = { origData: null, modData: null, diffViewInfo: null, currentMode: 'custom', treeState: { expanded: new Set(), activeId: null }, currentViewXml: {} };
+let projOrig = null, projMod = null, projTemplate = null;
+let state = { 
+    origData: null, 
+    modData: null, 
+    templateData: null,
+    compareMode: 'modular', // 'modular' or 'template'
+    diffViewInfo: null, 
+    currentMode: 'custom', 
+    treeState: { expanded: new Set(), activeId: null }, 
+    currentViewXml: {} 
+};
 
 async function loadProject(inputEl, projRefName, btnId) {
     if(!inputEl.value) return;
     const btn = S(btnId); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Lade...`;
     await new Promise(r => setTimeout(r, 50)); 
     let p = new AditoProject(inputEl.value, projRefName); await p.index();
-    if(projRefName === "Original") projOrig = p; else projMod = p;
+    if(projRefName === "Original") projOrig = p; 
+    else if(projRefName === "Modular") projMod = p;
+    else if(projRefName === "Template") projTemplate = p;
     btn.innerHTML = `<i class="fa-solid fa-check text-success"></i> ${projRefName}`; checkReady();
 }
 S('f1').onchange = (e) => loadProject(e.target, "Original", 'btn-f1');
 S('f2').onchange = (e) => loadProject(e.target, "Modular", 'btn-f2');
+S('f3').onchange = (e) => loadProject(e.target, "Template", 'btn-f3');
 
 function checkReady() {
-    S('file-status').textContent = `${(projOrig?.files.size||0) + (projMod?.files.size||0)} Dateien geladen.`;
-    if (projOrig || projMod) {
-        const ents = new Set([...(projOrig?.entities||[]), ...(projMod?.entities||[])]);
+    S('file-status').textContent = `${(projOrig?.files.size||0) + (projMod?.files.size||0) + (projTemplate?.files.size||0)} Dateien geladen.`;
+    if (projOrig || projMod || projTemplate) {
+        const ents = new Set([...(projOrig?.entities||[]), ...(projMod?.entities||[]), ...(projTemplate?.entities||[])]);
         const sel = S('entitySelect'); sel.innerHTML = '<option value="">Entity auswählen...</option>';
         [...ents].sort().forEach(e => sel.add(new Option(e, e)));
         sel.disabled = false; S('btn-analyze').disabled = false; S('btn-reload').classList.remove('d-none');
     }
+    if (projOrig && projTemplate) {
+        S('tpl-toggle-container').classList.remove('d-none');
+    }
+}
+
+// Hilfsfunktion: Speichert den DOM Tree-State, damit Ordner beim Neuladen/Modus-Wechsel offen bleiben
+function saveTreeState() {
+    state.treeState.expanded.clear(); 
+    document.querySelectorAll('.tree-row:not(.collapsed)').forEach(el => { 
+        if(el.dataset.id) state.treeState.expanded.add(el.dataset.id); 
+    });
+    let active = document.querySelector('.tree-row.active');
+    if(active) state.treeState.activeId = active.dataset.id;
+}
+
+function toggleMode() {
+    state.compareMode = S('tplToggle').checked ? 'template' : 'modular';
+    
+    saveTreeState(); // Zuvor geklappte Elemente merken
+    
+    if(state.compareMode === 'template') {
+        document.body.classList.add('template-mode');
+    } else {
+        document.body.classList.remove('template-mode');
+    }
+    
+    renderTree();
+}
+
+function renderTreeStateful() {
+    saveTreeState(); // Wenn z.B. "Ignore title diffs" geklickt wird
+    renderTree();
 }
 
 // --- PARSER ---
@@ -490,14 +548,14 @@ function hasCustomModDescendant(node) {
 async function startAnalysis() { if(!S('entitySelect').value) return; state.treeState = { expanded: new Set(), activeId: null }; await performAnalysis(); }
 async function reloadEntity() {
     if(!S('entitySelect').value) return;
-    state.treeState.expanded.clear(); document.querySelectorAll('.tree-row:not(.collapsed)').forEach(el => { if(el.dataset.id) state.treeState.expanded.add(el.dataset.id); });
-    let active = document.querySelector('.tree-row.active'); state.treeState.activeId = active ? active.dataset.id : null;
+    saveTreeState(); // Aktuelle Baum-Struktur speichern
     
     S('tree-container').innerHTML = '<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Re-Indexierung der Projekte...</div>';
     await new Promise(r => setTimeout(r, 50));
     
     if (projOrig) await projOrig.index();
     if (projMod) await projMod.index();
+    if (projTemplate) await projTemplate.index();
 
     await performAnalysis();
 }
@@ -509,8 +567,10 @@ async function performAnalysis() {
     
     state.origData = await buildData(projOrig, entName); 
     state.modData = await buildData(projMod, entName); 
+    if (projTemplate) state.templateData = await buildData(projTemplate, entName);
     
     harmonizeExtensionPointsRecursive(state.origData.entity, state.modData.entity);
+    if(state.templateData) harmonizeExtensionPointsRecursive(state.templateData.entity, state.origData.entity);
     
     renderTree();
 }
@@ -569,16 +629,44 @@ async function buildData(project, entName) {
 }
 
 function getDeepValue(node) {
-    if (!node) return ""; let children = Array.from(node.childNodes).filter(n => n.nodeType === 1 && n.nodeName !== 'name');
-    if (children.length === 0) return node.textContent.trim(); return getDeepValue(children[0]);
+    if (!node) return ""; 
+    let elements = Array.from(node.childNodes).filter(n => n.nodeType === 1 && n.nodeName === 'element');
+    if (elements.length > 0) return elements.map(el => el.textContent.trim()).join('|');
+    
+    let children = Array.from(node.childNodes).filter(n => n.nodeType === 1 && n.nodeName !== 'name');
+    if (children.length === 0) {
+        let v = node.textContent.trim();
+        if (v === "") {
+            if (node.hasAttribute('v')) v = node.getAttribute('v');
+            else if (node.hasAttribute('value')) v = node.getAttribute('value');
+        }
+        return v;
+    }
+    return getDeepValue(children[0]);
 }
 
 async function extractNodeDataAsync(xml, targetNode, project) {
     for(let c of Array.from(xml.childNodes)) {
         if (c.nodeType === 1 && c.nodeName !== 'name' && !IGNORE_AS_PROPS.has(c.nodeName)) {
-            let val = c.textContent.trim();
-            if(c.firstElementChild) val = Array.from(c.childNodes).filter(sub => sub.nodeType===1 && sub.nodeName!=='name').map(sub => `${sub.nodeName}: ${sub.textContent.trim()}`).join(' | ');
-            else if (val === "") { if (c.hasAttribute('v')) val = c.getAttribute('v'); else if (c.hasAttribute('value')) val = c.getAttribute('value'); }
+            let val = "";
+            let elements = Array.from(c.childNodes).filter(n => n.nodeType === 1 && n.nodeName === 'element');
+            
+            if (elements.length > 0) {
+                val = elements.map(el => el.textContent.trim()).join('|');
+            } else if (c.firstElementChild) {
+                val = Array.from(c.childNodes).filter(sub => sub.nodeType===1 && sub.nodeName!=='name').map(sub => {
+                    let subVal = sub.textContent.trim();
+                    if(subVal==="" && sub.hasAttribute('v')) subVal = sub.getAttribute('v');
+                    if(subVal==="" && sub.hasAttribute('value')) subVal = sub.getAttribute('value');
+                    return `${sub.nodeName}: ${subVal}`;
+                }).join(' | ');
+            } else {
+                val = c.textContent.trim();
+                if (val === "") { 
+                    if (c.hasAttribute('v')) val = c.getAttribute('v'); 
+                    else if (c.hasAttribute('value')) val = c.getAttribute('value'); 
+                }
+            }
             
             if (ADITO_PROCESS_NAMES.has(c.nodeName)) {
                 targetNode.procs[c.nodeName] = val; 
@@ -679,19 +767,25 @@ function getDeepUniqueCount(oNodes, mNodes) {
 
 // --- RENDER HIERARCHY ---
 function renderTree() {
+    let isTpl = state.compareMode === 'template';
+    let leftData = isTpl ? state.templateData : state.origData;
+    let rightData = isTpl ? state.origData : state.modData;
+    
+    if(!leftData || !rightData) return;
+
     const cont = S('tree-container'); cont.innerHTML = '';
-    let ctxNodeOrig = state.origData.context, ctxNodeMod = state.modData.context;
-    let entNodeOrig = state.origData.entity, entNodeMod = state.modData.entity;
+    let ctxNodeOrig = leftData.context, ctxNodeMod = rightData.context;
+    let entNodeOrig = leftData.entity, entNodeMod = rightData.entity;
     let rootWrap = document.createElement('div'); let parentInd = 0;
 
     let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
 
     let viewsSub = document.createElement('div'); viewsSub.className = 'tree-sub';
     let viewsHasC = false, viewsHasP = false;
-    if (state.origData.views.length > 0 || state.modData.views.length > 0) {
-        let vNames = getUniqueNamesCI(state.origData.views, state.modData.views);
+    if (leftData.views.length > 0 || rightData.views.length > 0) {
+        let vNames = getUniqueNamesCI(leftData.views, rightData.views);
         vNames.sort((a,b)=>a.localeCompare(b)).forEach(vn => { 
-            let childWrap = createUiNode(findCaseInsensitive(state.origData.views, vn), findCaseInsensitive(state.modData.views, vn), parentInd+1);
+            let childWrap = createUiNode(findCaseInsensitive(leftData.views, vn), findCaseInsensitive(rightData.views, vn), parentInd+1);
             let cSt = childWrap.querySelector('.tree-row').dataset.st;
             if(cSt === 'C' || cSt === 'D' || cSt === 'N') viewsHasC = true;
             if(cSt === 'P') viewsHasP = true;
@@ -774,21 +868,21 @@ function renderTree() {
         
         let isCtxCustom = cM?.isCustom || false;
         let ctxExtraHtml = "";
-        if (!isCtxCustom && hasCustomModDescendant(cM)) {
+        if (!isCtxCustom && hasCustomModDescendant(cM) && !isTpl) {
             ctxExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
         }
         
-        let cRow = createUiRow(0, UI_CONFIG.neonContext.i, act.name, st, isCtxCustom, false, UI_CONFIG.neonContext.c, act.id, ctxExtraHtml);
+        let cRow = createUiRow(0, UI_CONFIG.neonContext.i, act.name, st, isCtxCustom && !isTpl, false, UI_CONFIG.neonContext.c, act.id, ctxExtraHtml);
         cRow.onclick = () => { activateRow(cRow); showProps(cO, cM); }; rootWrap.appendChild(cRow); parentInd = 1;
     }
 
     let isEntCustom = entNodeMod?.isCustom || false;
     let entExtraHtml = "";
-    if (!isEntCustom && hasCustomModDescendant(entNodeMod)) {
+    if (!isEntCustom && hasCustomModDescendant(entNodeMod) && !isTpl) {
         entExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
     }
     
-    let rRow = createUiRow(parentInd, UI_CONFIG.entity.i, entNodeOrig.name, entSt, isEntCustom, false, UI_CONFIG.entity.c, entNodeOrig.id, entExtraHtml);
+    let rRow = createUiRow(parentInd, UI_CONFIG.entity.i, entNodeOrig.name, entSt, isEntCustom && !isTpl, false, UI_CONFIG.entity.c, entNodeOrig.id, entExtraHtml);
     rRow.classList.add('no-children'); 
     rRow.onclick = () => { activateRow(rRow); showProps(entNodeOrig, entNodeMod); }; 
     rootWrap.appendChild(rRow);
@@ -808,6 +902,7 @@ function renderTree() {
 
 function createUiNode(o, m, indent) {
     let act = m || o; let st = 'E'; let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
+    let isTpl = state.compareMode === 'template';
     
     let propChanged = false; let procChanged = false;
     if(!o && m) { st = 'N'; propChanged = true; } else if(o && !m) { st = 'D'; propChanged = true; } else if(m?.isDeleted) { st = 'D'; propChanged = true; }
@@ -840,7 +935,7 @@ function createUiNode(o, m, indent) {
         if(!op && mp) { pst = 'N'; childHasP = true; } else if(op && !mp) { pst = 'D'; childHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; childHasP = true; }
         
         let isProcCustom = m?.customProcs?.has(p) || false;
-        let pr = createUiRow(indent+1, 'fa-code', p, pst, isProcCustom, false, '#58a6ff', act.id+'_'+p, "");
+        let pr = createUiRow(indent+1, 'fa-code', p, pst, isProcCustom && !isTpl, false, '#58a6ff', act.id+'_'+p, "");
         pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
         pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, o?.procs[p], m?.procs[p], m, o); };
         sub.appendChild(pr);
@@ -860,18 +955,20 @@ function createUiNode(o, m, indent) {
     }
 
     let extraHtml = "";
-    if (!isCust && hasCustomModDescendant(m)) {
+    if (!isCust && hasCustomModDescendant(m) && !isTpl) {
         extraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
     }
 
     if(act.type === 'neonView') {
-        let role = projMod?.viewRoles?.[act.name] || projOrig?.viewRoles?.[act.name];
+        let activeProjLeft = isTpl ? projTemplate : projOrig;
+        let activeProjRight = isTpl ? projOrig : projMod;
+        let role = activeProjRight?.viewRoles?.[act.name] || activeProjLeft?.viewRoles?.[act.name];
         if(role) extraHtml += `<span class="badge bg-primary ms-2" style="font-size:9px">${role}</span>`;
-        let refs = new Set([...getRefsCI(projOrig?.viewRefs, act.name), ...getRefsCI(projMod?.viewRefs, act.name)]).size;
+        let refs = new Set([...getRefsCI(activeProjLeft?.viewRefs, act.name), ...getRefsCI(activeProjRight?.viewRefs, act.name)]).size;
         if(refs > 0) extraHtml += `<span class="badge bg-secondary ms-2" style="font-size:9px; border:1px solid #30363d;" title="Referenz-Zähler"><i class="fa-solid fa-link"></i> ${refs}</span>`;
     }
 
-    let row = createUiRow(indent, conf.i, act.name, st, isCust, isExt, conf.c, act.id, extraHtml);
+    let row = createUiRow(indent, conf.i, act.name, st, isCust && !isTpl, isExt, conf.c, act.id, extraHtml);
     if(!state.treeState.expanded.has(act.id)) row.classList.add('collapsed');
 
     if(sub.childNodes.length === 0) { row.classList.add('no-children'); row.onclick = () => { activateRow(row); showProps(o, m); }; } 
@@ -883,9 +980,17 @@ function createUiNode(o, m, indent) {
 function createUiRow(ind, ic, txt, st, cust, ext, col, id, extraHTML = "") {
     const d = document.createElement('div'); d.className = 'tree-row'; d.style.paddingLeft = `${(ind * 20) + 10}px`; if(id) d.dataset.id = id;
     d.dataset.st = st;
-    const isDull = (st === 'E' || st === 'N');
+    const isDull = (st === 'E');
+    let isTpl = state.compareMode === 'template';
+    let diffCol = isTpl ? '#f85149' : '#d29922';
+
     let sC = 'transparent', bdr = 'none';
-    if(st === 'N') sC = '#8b949e'; else if(st === 'D') sC = '#f85149'; else if(st === 'C') sC = '#d29922'; else if(st === 'P') { sC = 'transparent'; bdr = '2px solid #d29922'; } else if(st === 'E') { sC = 'transparent'; bdr = '1px solid #30363d'; }
+    if(st === 'N') sC = diffCol; 
+    else if(st === 'D') sC = '#f85149'; 
+    else if(st === 'C') sC = diffCol; 
+    else if(st === 'P') { sC = 'transparent'; bdr = '2px solid ' + diffCol; } 
+    else if(st === 'E') { sC = 'transparent'; bdr = '1px solid #30363d'; }
+
     const textCol = isDull ? '#8b949e' : '#c9d1d9'; const iconOp = isDull ? '0.6' : '1';
     const bC = cust ? `<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>` : '';
     const bE = ext ? `<span class="badge shadow-sm ms-1 text-dark" style="font-size:9px; background-color:#ff79c6;">EXT</span>` : '';
@@ -922,11 +1027,12 @@ function showProps(o, m) {
 
     let act = m || o; let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' };
     if(act.isExt) conf = UI_CONFIG.ExtensionPoint;
+    let isTpl = state.compareMode === 'template';
     
     let hasMods = m && (m.customProps.size > 0 || m.customProcs.size > 0 || m.isCustom);
-    if(hasMods) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
+    if(hasMods && !isTpl) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
 
-    let b = act.isCustom ? `<span class="badge badge-custom ms-2">CUSTOM</span>` : '';
+    let b = (act.isCustom && !isTpl) ? `<span class="badge badge-custom ms-2">CUSTOM</span>` : '';
     S('view-title').innerHTML = `<i class="fa-solid ${conf.i} me-2" style="color:${conf.c}"></i> ${act.name} ${b}`;
 
     if(act.type === 'neonView') { renderViews(o, m); return; }
@@ -960,8 +1066,8 @@ function showProps(o, m) {
 
                 let badgeTxt = 'Identisch', badgeCol = '#8b949e', icon = 'fa-check';
                 if (oC && !mC) { badgeTxt = 'Entfernt'; badgeCol = '#f85149'; icon = 'fa-minus'; }
-                else if (!oC && mC) { badgeTxt = 'Neu'; badgeCol = '#3fb950'; icon = 'fa-plus'; }
-                else if (normalizeStr(oC) !== normalizeStr(mC)) { badgeTxt = 'Geändert'; badgeCol = '#d29922'; icon = 'fa-pen'; }
+                else if (!oC && mC) { badgeTxt = 'Neu'; badgeCol = isTpl ? '#f85149' : '#3fb950'; icon = 'fa-plus'; }
+                else if (normalizeStr(oC) !== normalizeStr(mC)) { badgeTxt = 'Geändert'; badgeCol = isTpl ? '#f85149' : '#d29922'; icon = 'fa-pen'; }
                 
                 valH = `<span class="badge" style="border: 1px solid ${badgeCol}; color: ${badgeCol}; background: transparent;"><i class="fa-solid ${icon}"></i> ${badgeTxt}</span>`;
                 rowHover = "prop-row-interactive";
@@ -969,9 +1075,9 @@ function showProps(o, m) {
                 valColor = badgeCol;
             }
 
-            let isCustomDiff = isMod && realM?.customProps.has(p) && state.currentMode === 'custom';
-            let bClass = diff && !isProc ? (isCustomDiff ? "subtle-diff-border-custom" : "subtle-diff-border") : "";
-            let tClass = diff && !isProc ? (isCustomDiff ? 'text-custom fw-bold' : 'text-warning fw-bold') : '';
+            let isCustomDiff = isMod && realM?.customProps.has(p) && state.currentMode === 'custom' && !isTpl;
+            let bClass = diff && !isProc ? (isTpl ? "subtle-diff-border-template" : (isCustomDiff ? "subtle-diff-border-custom" : "subtle-diff-border")) : "";
+            let tClass = diff && !isProc ? (isTpl ? 'text-template fw-bold' : (isCustomDiff ? 'text-custom fw-bold' : 'text-warning fw-bold')) : '';
 
             return `<tr class="${rowHover}" ${trAttrs}><td class="${bClass}" style="width:35%; border-color:#30363d; transition: background 0.1s;"><span style="color:${propColor}; font-weight:${propWeight};">${p}</span></td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${diff && !isProc?'':valColor}; transition: background 0.1s;">${valH}</td></tr>`;
         };
@@ -990,22 +1096,24 @@ function showProps(o, m) {
     
     let mPropsToUse = m ? (state.currentMode === 'core' && Object.keys(m.coreProps || {}).length > 0 ? m.coreProps : m.props) : {};
 
-    let fH1 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Original Base</h6>`;
-    let fH2 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Modular Target ${state.currentMode === 'core' && hasMods ? '(Core)' : ''}</h6>`;
+    let fH1 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">${isTpl ? 'Template Base' : 'Original Base'}</h6>`;
+    let fH2 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">${isTpl ? 'Source Target' : 'Modular Target'} ${state.currentMode === 'core' && hasMods && !isTpl ? '(Core)' : ''}</h6>`;
 
     if (isOrigMissing && !isModMissing) {
-        fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Element existiert im Original nicht (Neu in Modular).</div>`;
+        fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Element existiert in Base nicht (Neu in Target).</div>`;
         fH2 += buildTable(mPropsToUse, mPropsToUse, true, o, m, act.type);
     } else if (!isOrigMissing && isModMissing) {
         fH1 += buildTable(o.props, o.props, false, o, m, act.type);
-        fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Element existiert in Modular nicht mehr (Gelöscht).</div>`;
+        fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Element existiert in Target nicht mehr (Gelöscht).</div>`;
     } else {
         fH1 += buildTable(o.props, mPropsToUse, false, o, m, act.type);
         fH2 += buildTable(mPropsToUse, o.props, true, o, m, act.type);
     }
 
     if (act.type === 'entity') {
-        let cO = state.origData.context, cM = state.modData.context;
+        let leftData = isTpl ? state.templateData : state.origData;
+        let rightData = isTpl ? state.origData : state.modData;
+        let cO = leftData.context, cM = rightData.context;
         let cMProps = cM ? (state.currentMode === 'core' && Object.keys(cM.coreProps || {}).length > 0 ? cM.coreProps : cM.props) : {};
 
         if (cO || cM) {
@@ -1016,11 +1124,11 @@ function showProps(o, m) {
             let isCtxModMissing = !cM || cM.isDeleted;
 
             if (isCtxOrigMissing && !isCtxModMissing) {
-                fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Kontext existiert im Original nicht (Neu).</div></div>`;
+                fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Kontext existiert in Base nicht (Neu).</div></div>`;
                 fH2 += buildTable(cMProps, cMProps, true, cO, cM, 'neonContext') + `</div>`;
             } else if (!isCtxOrigMissing && isCtxModMissing) {
                 fH1 += buildTable(cO.props, cO.props, false, cO, cM, 'neonContext') + `</div>`;
-                fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Kontext existiert in Modular nicht mehr.</div></div>`;
+                fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Kontext existiert in Target nicht mehr.</div></div>`;
             } else {
                 fH1 += buildTable(cO.props, cMProps, false, cO, cM, 'neonContext') + `</div>`;
                 fH2 += buildTable(cMProps, cO.props, true, cO, cM, 'neonContext') + `</div>`;
@@ -1047,12 +1155,14 @@ function generateTplTable(tpl, compTpl, isMod, actIsCustom) {
     let props = tpl.props; let compProps = compTpl ? compTpl.props : {};
     let allProps = new Set([...Object.keys(props), ...Object.keys(compProps)]);
     let tProps = "";
+    let isTpl = state.compareMode === 'template';
+
     [...allProps].sort().forEach(p => {
         let v = props[p]; let cv = compProps[p];
         if(v === undefined && isMod) return; 
         let isDiff = v !== cv && (v!==undefined && cv!==undefined);
-        let bClass = isDiff ? (isMod && actIsCustom ? "subtle-diff-border-custom" : "subtle-diff-border") : "";
-        let tClass = isDiff ? (isMod && actIsCustom ? 'text-custom fw-bold' : 'text-warning fw-bold') : '';
+        let bClass = isDiff ? (isTpl ? "subtle-diff-border-template" : (isMod && actIsCustom ? "subtle-diff-border-custom" : "subtle-diff-border")) : "";
+        let tClass = isDiff ? (isTpl ? 'text-template fw-bold' : (isMod && actIsCustom ? 'text-custom fw-bold' : 'text-warning fw-bold')) : '';
         let valH = v !== undefined ? escapeHtml(v) : ``;
         let valColor = (v === undefined) ? '#6e7681' : (isDiff ? '' : '#c9d1d9');
         tProps += `<tr><td class="${bClass}" style="width:30%; border-color:#30363d; color:#8b949e;">${p}</td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${valColor};">${valH}</td></tr>`;
@@ -1063,7 +1173,11 @@ function generateTplTable(tpl, compTpl, isMod, actIsCustom) {
 function renderViews(o, m) {
     state.currentViewXml = { 1: o?.rawXml?.outerHTML || "", 2: m?.rawXml?.outerHTML || "" };
     let act = m || o; 
-    let refs = new Set([...getRefsCI(projOrig?.viewRefs, act.name), ...getRefsCI(projMod?.viewRefs, act.name)]);
+    let isTpl = state.compareMode === 'template';
+    let activeProjLeft = isTpl ? projTemplate : projOrig;
+    let activeProjRight = isTpl ? projOrig : projMod;
+
+    let refs = new Set([...getRefsCI(activeProjLeft?.viewRefs, act.name), ...getRefsCI(activeProjRight?.viewRefs, act.name)]);
     
     let refStr = `<div class="prop-box mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">`;
     if(refs.size > 0) { refStr += [...refs].sort().map(c => `<span class="badge ${c.startsWith('Context:') ? 'bg-primary' : 'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''); } 
@@ -1091,23 +1205,23 @@ function renderViews(o, m) {
             let itemStyle = "background:#161b22; border-color:#30363d;";
             
             if(isRef) {
-                titleCol = '#8b949e'; // Subtler color for references
+                titleCol = '#8b949e'; 
                 let entName = S('entitySelect').value.toLowerCase();
-                let isInternal = projMod?.contextViews.get(entName)?.has(tpl.originalName) || projOrig?.contextViews.get(entName)?.has(tpl.originalName);
+                let isInternal = activeProjRight?.contextViews.get(entName)?.has(tpl.originalName) || activeProjLeft?.contextViews.get(entName)?.has(tpl.originalName);
                 
                 if (isInternal) {
                     refBadge = `<span class="badge bg-dark border border-secondary text-secondary ms-2 fw-normal" style="font-size:9px;">Interne Referenz</span>`;
                 } else {
                     refBadge = `<span class="badge bg-dark border border-warning text-warning ms-2 fw-normal" style="font-size:9px;">Externe Referenz</span>`;
                 }
-                itemStyle = "background:#0d1117; border-color:#30363d;"; // darker bg
+                itemStyle = "background:#0d1117; border-color:#30363d;"; 
             } else {
                 refBadge = ""; 
             }
 
             let isDiff = false; if(!compTpl) isDiff = true; else if(JSON.stringify(tpl.props) !== JSON.stringify(compTpl.props)) isDiff = true;
             if(isDiff) {
-                titleCol = isMod && actIsCustom ? '#d2a8ff' : '#d29922';
+                titleCol = isTpl ? '#f85149' : (isMod && actIsCustom ? '#d2a8ff' : '#d29922');
             }
             
             let tProps = generateTplTable(tpl, compTpl, isMod, actIsCustom);
@@ -1132,18 +1246,21 @@ function renderViews(o, m) {
     let modContent = "";
 
     if (isOrigMissing && !isModMissing) {
-        origContent = `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> View existiert im Original nicht (Neu).</div>`;
+        origContent = `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> View existiert in Base nicht (Neu).</div>`;
         modContent = buildSide(mTpls, mTpls, 2, true, act.isCustom, mergedOrder);
     } else if (!isOrigMissing && isModMissing) {
         origContent = buildSide(oTpls, oTpls, 1, false, false, mergedOrder);
-        modContent = `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> View existiert in Modular nicht mehr (Gelöscht).</div>`;
+        modContent = `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> View existiert in Target nicht mehr (Gelöscht).</div>`;
     } else {
         origContent = buildSide(oTpls, mTpls, 1, false, false, mergedOrder);
         modContent = buildSide(mTpls, oTpls, 2, true, act.isCustom, mergedOrder);
     }
 
-    S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Original Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + origContent;
-    S('pane2').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Modular Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + modContent;
+    let leftTitle = isTpl ? "Template Templates & Refs" : "Original Templates & Refs";
+    let rightTitle = isTpl ? "Source Templates & Refs" : "Modular Templates & Refs";
+
+    S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${leftTitle}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + origContent;
+    S('pane2').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${rightTitle}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + modContent;
 }
 
 // --- DIFF VIEW ---
@@ -1157,6 +1274,8 @@ async function loadDiff(pName, pOrig, pMod, targetNode, origNode) {
     S('diff-toolbar').classList.remove('d-none'); 
     S('diff-toolbar').classList.add('d-flex');
     
+    let isTpl = state.compareMode === 'template';
+    
     S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pName}`;
     S('diff-html-target').innerHTML = '<div class="p-5 text-center" style="color:#58a6ff"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i><br>Lade Code...</div>';
 
@@ -1166,15 +1285,19 @@ async function loadDiff(pName, pOrig, pMod, targetNode, origNode) {
     let isCustomMod = targetNode?.customProcs.has(pName) || false;
     state.diffViewInfo = { origCode: cOrig, modCode: cMod, sourceCode: cSource, name: pName, pOrig: pOrig, pMod: pMod, isCustomMod: isCustomMod, targetNode: targetNode };
     
-    if(isCustomMod) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
-    setMode(isCustomMod ? 'custom' : 'core');
+    if(isCustomMod && !isTpl) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
+    setMode((isCustomMod && !isTpl) ? 'custom' : 'core');
 }
 
 async function reloadCurrentProcess() {
     if(state.diffViewInfo) {
+        let isTpl = state.compareMode === 'template';
+        let activeProjLeft = isTpl ? projTemplate : projOrig;
+        let activeProjRight = isTpl ? projOrig : projMod;
         let { name, pOrig, pMod, targetNode } = state.diffViewInfo;
-        if(pOrig) { let f = projOrig.findFile(pOrig); if(f) state.diffViewInfo.origCode = await projOrig.readText(f.fullPath); }
-        if(pMod) { let f = projMod.findFile(pMod); if(f) { state.diffViewInfo.modCode = await projMod.readText(f.fullPath); targetNode.procContents[name] = state.diffViewInfo.modCode; } }
+        
+        if(pOrig) { let f = activeProjLeft.findFile(pOrig); if(f) state.diffViewInfo.origCode = await activeProjLeft.readText(f.fullPath); }
+        if(pMod) { let f = activeProjRight.findFile(pMod); if(f) { state.diffViewInfo.modCode = await activeProjRight.readText(f.fullPath); targetNode.procContents[name] = state.diffViewInfo.modCode; } }
         setDiffMode(state.currentMode);
     }
 }
@@ -1182,17 +1305,21 @@ async function reloadCurrentProcess() {
 async function setDiffMode(mode) {
     if(!state.diffViewInfo) return;
 
-    let c1 = state.diffViewInfo.origCode; let c2 = mode === 'custom' ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode;
-    let activeModPath = mode === 'custom' ? state.diffViewInfo.pMod : (state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name] || state.diffViewInfo.pMod);
+    let isTpl = state.compareMode === 'template';
+    let rightName = isTpl ? "Source Target" : (mode==="custom" ? "Modular Target (Custom)" : "Modular Target (Core)");
+    let leftName = isTpl ? "Template Base" : "Original Base";
+
+    let c1 = state.diffViewInfo.origCode; let c2 = (mode === 'custom' && !isTpl) ? state.diffViewInfo.modCode : (isTpl ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode);
+    let activeModPath = (mode === 'custom' && !isTpl) ? state.diffViewInfo.pMod : (state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name] || state.diffViewInfo.pMod);
     S('debug-path-mod').textContent = activeModPath || "Nicht vorhanden";
 
     let isRawMode = S('rawDiffToggle') && S('rawDiffToggle').checked;
 
     if (!c1 && c2) {
-        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> <strong>Neu in Modular.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c2)}</code></pre></div>`;
+        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> <strong>Neu in Target.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c2)}</code></pre></div>`;
         hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
     } else if (c1 && !c2) {
-        S('diff-html-target').innerHTML = `<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> <strong>Entfernt in Modular.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
+        S('diff-html-target').innerHTML = `<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> <strong>Entfernt in Target.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
         hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
     }
 
@@ -1222,14 +1349,14 @@ async function setDiffMode(mode) {
 
         S('diff-html-target').innerHTML = `
             <div class="d-flex flex-row flex-grow-1 overflow-hidden w-100 h-100">
-                ${buildRawPane('Original Base', c1, true)}
-                ${buildRawPane('Modular Target ' + (mode === 'core' ? '(Core)' : '(Custom)'), c2, false)}
+                ${buildRawPane(leftName, c1, true)}
+                ${buildRawPane(rightName, c2, false)}
             </div>
         `;
         hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[0]);
         hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[1]);
     } else {
-        const ds = Diff.createTwoFilesPatch("Original", mode==="custom" ? "Modular Target (Custom)" : "Modular Target (Core)", c1||"", c2||"", "", "", { context: 99999 });
+        const ds = Diff.createTwoFilesPatch(leftName, rightName, c1||"", c2||"", "", "", { context: 99999 });
         S('diff-html-target').innerHTML = '';
         const ui = new Diff2HtmlUI(S('diff-html-target'), ds, { drawFileList: false, matching: 'words', outputFormat: 'side-by-side', colorScheme: 'dark' }, hljs);
         ui.draw(); ui.highlightCode();
@@ -1253,8 +1380,9 @@ async function setDiffMode(mode) {
 
 function copySource(id) { 
     if(state.diffViewInfo) {
+        let isTpl = state.compareMode === 'template';
         let mode = S('btn-mode-custom').classList.contains('btn-custom') ? 'custom' : 'core';
-        let code = id === 1 ? state.diffViewInfo.origCode : (mode === 'custom' ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode);
+        let code = id === 1 ? state.diffViewInfo.origCode : ((mode === 'custom' && !isTpl) ? state.diffViewInfo.modCode : (isTpl ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode));
         navigator.clipboard.writeText(code);
         const btn = S('copy-btn-'+id); const origHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert'; btn.classList.add('text-success', 'border-success');
