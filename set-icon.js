@@ -3,8 +3,8 @@ const path = require('path');
 
 async function run() {
     // Die Pfade zu deinen Dateien
-    const exePath = "C:\\Users\\Lion\\Desktop\\Adito Migrator v.1.0_original.exe";
-    const icoPath = "C:\\Users\\Lion\\Desktop\\AditoMigrator\\icon.ico";
+    const exePath = "C:/Users/LionSperlich/Desktop/Adito Migrator v.1.1.exe";
+    const icoPath = "C:/Users/LionSperlich/Desktop/AditoMigrator/icon.ico";
 
     console.log("⏳ Tausche Icon und Metadaten sicher aus...");
 

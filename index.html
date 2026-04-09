@@ -137,8 +137,8 @@
             
             <div class="d-flex align-items-center gap-2">
                 <div class="btn-group btn-group-sm shadow-sm me-3 d-none" id="mode-toggle">
-                    <button class="btn btn-secondary" id="btn-mode-core" onclick="setMode('core')">Modul Core</button>
-                    <button class="btn btn-custom" id="btn-mode-custom" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
+                    <button class="btn btn-secondary fw-bold" id="btn-mode-core" onclick="setMode('core')">Modul Core</button>
+                    <button class="btn btn-outline-secondary" id="btn-mode-custom" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
                 </div>
                 
                 <div id="diff-toolbar" class="d-none align-items-center gap-2 border-start border-secondary ps-3 ms-1">
@@ -243,7 +243,9 @@ const PROP_DICTIONARY = {
     consumerMapping: { groups: { "General": ["type", "filterConditionProcess"], "Search": ["filtertype", "isFilterable", "isLookupFilter"] }, defaults: { isFilterable: "false", isLookupFilter: "false" } },
     filterExtension: { groups: { "General": ["type", "documentation", "title", "isFilterable", "contentType", "useConsumer", "consumer", "filterValuesProcess", "filterConditionProcess", "groupedRecordField", "titleRecordField", "isGroupable", "groupQueryProcess"], "Search": ["filtertype", "isLookupfilter"] }, defaults: { isFilterable: "true", useConsumer: "false", isGroupable: "false", filtertype: "EXTENDED" } },
     neonContext: { groups: { "General": ["title", "devices", "description", "documentation", "comment", "icon", "iconProcess"], "Entity": ["entity"], "Views": ["viewmodeProvider", "mainView", "filterView", "editView", "previewView", "previewMultipleView", "lookupView"] }, defaults: { devices: "MOBILE|TABLET|DESKTOP" } },
-    neonView: { groups: { "General": ["title", "type", "description", "documentation", "icon", "iconProcess", "quickEntry", "filterable", "size", "isOverlay"], "Others": ["layout"] }, defaults: { filterable: "false", size: "NORMAL", isOverlay: "false" } }
+    neonView: { groups: { "General": ["title", "type", "description", "documentation", "icon", "iconProcess", "quickEntry", "filterable", "size", "isOverlay"], "Others": ["layout"] }, defaults: { filterable: "false", size: "NORMAL", isOverlay: "false" } },
+    entityServiceDefinition: { groups: { "General": ["name", "documentation"] }, defaults: {} },
+    serviceImplementation: { groups: { "General": ["name", "process"] }, defaults: {} }
 };
 
 const UI_CONFIG = {
@@ -400,7 +402,8 @@ class TreeNode {
 }
 
 function extractTemplates(xml) {
-    let tpls = {}; if(!xml) return tpls;
+    let tpls = { items: {}, order: [] };
+    if(!xml) return tpls;
     let children = xml.getElementsByTagName('children')[0]; if(!children) return tpls;
     Array.from(children.childNodes).filter(n=>n.nodeType===1).forEach(c => {
         let type = c.nodeName; 
@@ -425,10 +428,23 @@ function extractTemplates(xml) {
             } else if(val==="") { if(sub.hasAttribute('v')) val = sub.getAttribute('v'); else if(sub.hasAttribute('value')) val = sub.getAttribute('value'); }
             props[sub.nodeName] = val;
         });
-        while(getTplCI(tpls, name)) name += "_dup";
-        tpls[name] = { type: type, props: props };
+        
+        let originalName = name;
+        while(getTplCI(tpls.items, name)) name += "_dup";
+        tpls.items[name] = { type: type, props: props, originalName: originalName };
+        tpls.order.push(name);
     });
     return tpls;
+}
+
+function mergeTemplateOrders(order1, order2) {
+    let merged = [];
+    let seen = new Set();
+    (order1 || []).forEach(n => { merged.push(n); seen.add(n.toLowerCase()); });
+    (order2 || []).forEach(n => {
+        if(!seen.has(n.toLowerCase())) { merged.push(n); seen.add(n.toLowerCase()); }
+    });
+    return merged;
 }
 
 function harmonizeExtensionPointsRecursive(origNode, modNode) {
@@ -581,7 +597,10 @@ async function extractNodeDataAsync(xml, targetNode, project) {
 async function parseWalkerAsync(xml, parentTree, fileObj, isCustom, project) {
     for(let c of Array.from(xml.childNodes)) {
         if (c.nodeType !== 1) continue;
-        let isExt = c.nodeName.toLowerCase().includes('extensionpoint') || (c.nodeName !== 'entityServiceDefinition' && c.nodeName !== 'entityActionGroup' && Array.from(c.childNodes).some(n => n.nodeName === 'implementations'));
+        let nodeNameLower = c.nodeName.toLowerCase();
+        let isExt = nodeNameLower.includes('extensionpoint') || 
+            (nodeNameLower !== 'entityservicedefinition' && nodeNameLower !== 'entityactiongroup' && Array.from(c.childNodes).some(n => n.nodeName.toLowerCase() === 'implementations'));
+        
         if (isExt) {
             let baseType = c.nodeName.replace('ExtensionPoint', ''); let impls = Array.from(c.childNodes).find(n => n.nodeName === 'implementations');
             if(impls && impls.firstElementChild) baseType = impls.firstElementChild.nodeName;
@@ -595,6 +614,7 @@ async function parseWalkerAsync(xml, parentTree, fileObj, isCustom, project) {
             let type = c.nodeName; if(type.endsWith('RecordContainer')) type = 'recordContainer'; if(type.endsWith('RecordFieldMapping') || type === 'consumerMapping') type = 'recordFieldMapping';
             let node = new TreeNode(nameNode.textContent.trim(), type, fileObj, parentTree.id + '_' + nameNode.textContent.trim());
             node.isCustom = isCustom;
+            if(parentTree.type === 'ExtensionPoint') node.isExt = true;
             await extractNodeDataAsync(c, node, project); parentTree.children.push(node); await parseWalkerAsync(c, node, fileObj, isCustom, project);
         }
     }
@@ -644,6 +664,18 @@ async function applyModAsync(xml, rootTree, fileObj, project) {
 
 function normalizeStr(s) { return (s||"").replace(/\s+/g, ''); }
 function sortProcs(a,b) { let iA = ADITO_PROCESS_NAMES_ARR.indexOf(a); let iB = ADITO_PROCESS_NAMES_ARR.indexOf(b); if(iA===-1) iA=999; if(iB===-1) iB=999; return iA - iB; }
+
+function getDeepUniqueCount(oNodes, mNodes) {
+    let uniqueElements = new Set();
+    function traverse(nodes) {
+        (nodes || []).forEach(n => {
+            if (!n.isExt) uniqueElements.add(n.name.toLowerCase());
+            if (n.isExt && n.children) traverse(n.children);
+        });
+    }
+    traverse(oNodes); traverse(mNodes);
+    return uniqueElements.size;
+}
 
 // --- RENDER HIERARCHY ---
 function renderTree() {
@@ -706,8 +738,10 @@ function renderTree() {
         let allN = getUniqueNamesCI(oNodes, mNodes); 
         if(allN.length === 0) return;
 
+        let totalCount = getDeepUniqueCount(oNodes, mNodes);
+
         let conf = UI_CONFIG[gType] || { i: 'fa-folder', c: '#8b949e', l: gType }; let hdrId = 'hdr_' + gType;
-        let hdr = createUiRow(parentInd+1, conf.i, `${conf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${allN.length}</span>`, 'E', false, false, conf.c, hdrId);
+        let hdr = createUiRow(parentInd+1, conf.i, `${conf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${totalCount}</span>`, 'E', false, false, conf.c, hdrId);
         hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
 
         let sub = document.createElement('div'); sub.className = 'tree-sub';
@@ -1038,32 +1072,57 @@ function renderViews(o, m) {
 
     let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
 
-    const buildSide = (tpls, compTpls, side, isMod, actIsCustom) => {
-        let localTplNames = getUniqueStringCI(Object.keys(tpls), Object.keys(compTpls));
+    const buildSide = (tplsMap, compTplsMap, side, isMod, actIsCustom, orderedNames) => {
         let h = `<div class="list-group list-group-flush rounded-1 border" style="border-color: #30363d !important;">`;
-        if(localTplNames.length === 0) return h + `<div class="p-3 text-muted small">Keine Templates</div></div>`;
+        if(orderedNames.length === 0) return h + `<div class="p-3 text-muted small">Keine Templates</div></div>`;
         
-        localTplNames.sort().forEach(tName => {
-            let tpl = getTplCI(tpls, tName); let compTpl = getTplCI(compTpls, tName);
+        orderedNames.forEach(tName => {
+            let tpl = getTplCI(tplsMap.items, tName); let compTpl = getTplCI(compTplsMap.items, tName);
             let hash = Math.random().toString(36).substr(2, 9); let collapseId = 'tpl_' + side + '_' + hash; let chevronId = 'chev_' + side + '_' + hash;
 
             if(!tpl) { h += `<div class="list-group-item p-2" style="background:#161b22; border-color:#30363d; opacity:0.5;"><div class="text-danger fw-bold"><i class="fa-solid fa-minus"></i> Fehlt (in dieser Version)</div></div>`; return; }
             
-            let type = tpl.type; let icon = type === 'neonViewReference' ? 'fa-link' : 'fa-layer-group';
+            let type = tpl.type; 
+            let isRef = (type === 'neonViewReference');
+            let icon = isRef ? 'fa-link' : 'fa-layer-group';
+            
+            let titleCol = '#58a6ff'; 
+            let refBadge = "";
+            let itemStyle = "background:#161b22; border-color:#30363d;";
+            
+            if(isRef) {
+                titleCol = '#8b949e'; // Subtler color for references
+                let entName = S('entitySelect').value.toLowerCase();
+                let isInternal = projMod?.contextViews.get(entName)?.has(tpl.originalName) || projOrig?.contextViews.get(entName)?.has(tpl.originalName);
+                
+                if (isInternal) {
+                    refBadge = `<span class="badge bg-dark border border-secondary text-secondary ms-2 fw-normal" style="font-size:9px;">Interne Referenz</span>`;
+                } else {
+                    refBadge = `<span class="badge bg-dark border border-warning text-warning ms-2 fw-normal" style="font-size:9px;">Externe Referenz</span>`;
+                }
+                itemStyle = "background:#0d1117; border-color:#30363d;"; // darker bg
+            } else {
+                refBadge = ""; 
+            }
+
             let isDiff = false; if(!compTpl) isDiff = true; else if(JSON.stringify(tpl.props) !== JSON.stringify(compTpl.props)) isDiff = true;
-            let titleCol = isDiff ? (isMod && actIsCustom ? '#d2a8ff' : '#d29922') : '#58a6ff';
+            if(isDiff) {
+                titleCol = isMod && actIsCustom ? '#d2a8ff' : '#d29922';
+            }
+            
             let tProps = generateTplTable(tpl, compTpl, isMod, actIsCustom);
             
-            h += `<div class="list-group-item p-0 view-tpl-header" style="background:#161b22; border-color:#30363d;">
+            h += `<div class="list-group-item p-0 view-tpl-header" style="${itemStyle}">
                     <div class="p-2 d-flex align-items-center" onclick="toggleTemplate('${collapseId}', '${chevronId}')">
                         <i id="${chevronId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i>
-                        <div><div class="fw-bold" style="color:${titleCol}"><i class="fa-solid ${icon} me-1"></i> ${tName}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${type}</div></div>
+                        <div><div class="fw-bold" style="color:${titleCol}"><i class="fa-solid ${icon} me-1"></i> ${tName} ${refBadge}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${type}</div></div>
                     </div><table id="${collapseId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px; background:#0d1117;"><tbody>${tProps}</tbody></table>
                   </div>`;
         });
         return h + '</div>';
     };
 
+    let mergedOrder = mergeTemplateOrders(oTpls.order, mTpls.order);
     let ctrlBar = `<div class="mb-2"><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
     
     let isOrigMissing = !o;
@@ -1074,13 +1133,13 @@ function renderViews(o, m) {
 
     if (isOrigMissing && !isModMissing) {
         origContent = `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> View existiert im Original nicht (Neu).</div>`;
-        modContent = buildSide(mTpls, mTpls, 2, true, act.isCustom);
+        modContent = buildSide(mTpls, mTpls, 2, true, act.isCustom, mergedOrder);
     } else if (!isOrigMissing && isModMissing) {
-        origContent = buildSide(oTpls, oTpls, 1, false, false);
+        origContent = buildSide(oTpls, oTpls, 1, false, false, mergedOrder);
         modContent = `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> View existiert in Modular nicht mehr (Gelöscht).</div>`;
     } else {
-        origContent = buildSide(oTpls, mTpls, 1, false, false);
-        modContent = buildSide(mTpls, oTpls, 2, true, act.isCustom);
+        origContent = buildSide(oTpls, mTpls, 1, false, false, mergedOrder);
+        modContent = buildSide(mTpls, oTpls, 2, true, act.isCustom, mergedOrder);
     }
 
     S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Original Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + origContent;
@@ -1143,7 +1202,6 @@ async function setDiffMode(mode) {
     }
     
     if (isRawMode) {
-        // Hilfsfunktion zum Generieren einer Seite inklusive Zeilennummern
         const buildRawPane = (title, code, isLeft) => {
             let linesCount = (code || "").split('\n').length;
             let lineNums = '';
