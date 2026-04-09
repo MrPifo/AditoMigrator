@@ -1036,3 +1036,216 @@ Im Root:
 -serviceDefinition
 --serviceName (als Ordner)
 ---serviceName.aod
+
+
+Hier nochmal eine aufbereitete Übersicht:
+1. ADITO PROJEKTSTRUKTUREN & REGELN
+Original-Projekt: Meist monolithisch. Entitäten liegen in entity/[EntityName]_entity/ (oft eine große .aod-Datei).
+
+Modular-Projekt (Core): Liegt in node_modules/@aditosoftware/[Modul]/.... Nutzt "Split-AODs" (z.B. Ordner entityFields/ mit vielen kleinen .aod-Dateien).
+
+Modular-Projekt (Customizing): Eigene Modifikationen liegen im Stammordner unter modification/ (Dateinamen sind UUIDs). Selbst erstellte Dateien (z.B. Custom Views) liegen in Root-Ordnern (z.B. neonView/).
+
+Ignorierte Dateien: Der Ordner dist/ (gebautes Projekt) wird beim Datei-Einlesen komplett ignoriert, um den Speicher zu schonen.
+
+Wichtige Ordner im Root:
+
+entity => darin liegen alle .aod Dateien zu den Entitäten
+
+neonContext => darin liegen die Kontext .aod Dateien zu den Kontexten. WICHTIG: Dies ist die absolute Source of Truth, um herauszufinden, welche Views zu welcher Entität gehören!
+
+neonView => darin liegen alle erstellten Views im Projekt (Hinweis: Jede View muss im Namen global einzigartig sein).
+
+node_modules => npm install Zielordner mit NodeJS und den ADITO Modulen.
+
+process => Custom Libraries (Bibliotheken) werden hier gespeichert.
+
+modification => Hier werden Modifizierungen (INSERT, MODIFY, DELETE) gespeichert.
+
+2. ABHÄNGIGKEITEN & KONTEXT-ZUORDNUNGEN (SEHR WICHTIG)
+Views & Kontexte:
+Es ist eine falsche Annahme, dass eine View zu einer Entität gehört, nur weil der Name der Entität in der View vorkommt. Die Zuordnung passiert ausschließlich über den neonContext. In der [ContextName].aod stehen alle Views, die zu diesem Kontext gehören.
+Beispiel einer Context.aod:
+
+XML
+<neonContext ...>
+  <name>Organisation</name>
+  <entity>Organisation_entity</entity>
+  <mainView>OrganisationMain_view</mainView>
+  <filterView>OrganisationFilter_view</filterView>
+  <editView>OrganisationEdit_view</editView>
+  <references>
+    <neonViewReference>
+      <name>c71a570c-2408-474d-961a-7409d0999fde</name> <view>OrganisationFilter_view</view> </neonViewReference>
+  </references>
+</neonContext>
+Regel: Bei neonViewReference muss zwingend der <view> Tag ausgelesen werden, da <name> nur eine irrelevante UUID enthält.
+
+Libraries & Imports (Isolierte Prüfung):
+Custom Javascript Bibliotheken liegen im Root-Ordner unter process. Für jede Library entsteht ein Ordner mit dem Namen der Library. Darin liegt eine .aod und direkt daneben die process.js.
+Beispiel .aod:
+
+XML
+<process>
+  <name>Util_lib</name>
+  <process>%aditoprj%/process/Util_lib/process.js</process>
+</process>
+Regel zur Import-Prüfung: Importe (z.B. import { newSelect } from "SqlBuilder_lib") dürfen nur strikt isoliert innerhalb des jeweiligen Projektstandes geprüft werden (Original prüft im Original-Tree, Modul im Modul-Tree). Man muss die process.js der Library parsen, um zu prüfen, ob die exportierte Funktion (z.B. newSelect) wirklich existiert. Importe von @aditosoftware/... oder relativen Pfaden (.) werden ignoriert.
+
+3. MODIFIKATIONEN (CUSTOMIZING)
+Damit ein Modul von anderen Modulen oder von uns customized werden kann, nutzt ADITO den modification Ordner. Das können MODIFY, INSERT oder DELETE Operationen sein.
+Für das Hinzufügen von neuen Elementen nutzt Adito ExtensionPoints. Unter diesen können neue Felder hinzugefügt werden.
+
+Besonderheit bei Context-Modifikationen (Views hinzufügen/ersetzen):
+Wenn in der modularen Variante Views einem Kontext hinzugefügt werden, geschieht dies über Modifikationen vom Typ <modelType>neonContext</modelType>.
+Fall 1: View ersetzen (MODIFY):
+Der neue View-Name steht in einem <value> Tag (z.B. <value>CustomEdit_view</value>).
+Fall 2: View Reference hinzufügen (INSERT):
+Die View ist in einem <modelValueWrapper> gekapselt und der Name steht in einem <view> Tag!
+
+XML
+<modification ...>
+  <modelType>neonContext</modelType>
+  <changeType>INSERT</changeType>
+  <value>
+    <modelValueWrapper>
+      <value>
+        <neonViewReference>
+          <name>e21bf8c4-5d81-...</name>
+          <view>THHIT_ActivityEdit_view</view> </neonViewReference>
+      </value>
+    </modelValueWrapper>
+  </value>
+</modification>
+4. PROPERTIES & DEFAULT WERTE (UI & RENDERING)
+In Adito gibt es dutzende Werte für Felder/Consumer/Provider etc. Adito definiert für einige Konfigurationen Standard-Werte (Defaults). Diese werden nicht in der .aod Datei gespeichert, wenn sie nicht vom Standard abweichen.
+Regel für das Diff-Tool: Alle bekannten Properties MÜSSEN in der Detailansicht gerendert werden, auch wenn sie in der XML fehlen (dann zieht der Default-Wert). Um das visuell kenntlich zu machen, müssen Properties, die nicht explizit in der XML stehen (sondern vom Default kommen), dezent ausgegraut dargestellt werden.
+
+Visuelle Diff-Unterscheidung (Struktur-Baum):
+
+Massiver gelber Punkt: Eine Property hat sich geändert oder ein Element ist komplett neu/entfernt.
+
+Leerer gelber Ring (Prozess-Diff): Die Properties des Elements sind exakt gleich, aber ein darunterliegender JavaScript-Prozess (z.B. onValidation) hat sich inhaltlich geändert. (Whitespaces ignorieren!).
+
+Grauer Punkt: Keine Änderungen (Gleich oder Modular-Only ohne Customizing).
+
+Sonderregel title Property: Es muss möglich sein, Änderungen am title Feld global bei der Diff-Berechnung zu ignorieren (Toggle-Button "Ignore 'title' diffs"), da ADITO in der modularen Version fast alle Titel geändert hat (Red Herrings vermeiden).
+
+5. ADITO HIERARCHIE & ORDNUNG
+Die Hierarchie und Sortierung in der UI muss exakt dem ADITO-Designer entsprechen. Prozesse und Properties werden NICHT alphabetisch sortiert, sondern fachlich gruppiert!
+
+Entitäts-Prozesse (Root Level):
+Die Prozesse der Entität selbst (afterSave, onValidation, grantCreate etc.) müssen direkt unter der Entität als Code-Blöcke in einer eigenen Gruppe ("Entity Processes") auftauchen.
+
+Gruppierungen der Hierarchie (Designer Order):
+
+Record Containers
+
+FieldMappings (für .value und .displayValue)
+
+Fields
+
+Parameters
+
+Providers
+
+Consumers
+
+Actions
+
+Action Groups
+
+Services (mit implementations)
+
+Filter Extensions
+
+Extension Points (werden dynamisch in die Typen einsortiert, wo sie hingehören)
+
+6. PROPERTY LISTEN & GRUPPIERUNGEN (REFERENZ)
+(Booleans sind standardmäßig false, wenn nicht anders angegeben. Prozesse sind mit "(Prozess)" markiert).
+
+Entity-Properties:
+
+#General: title, titlePlural, descriptionField, documentation, comment, metadata, useFavorites(bool), recordRecipeSupported(bool)
+
+#Source: recordContainer
+
+#Processes: onInit (Prozess), afterUIiInit (Prozess), beforeOperatingState (Prozess), afterOperatingState (Prozess), onValidation (Prozess), afterSave (Prozess), initFilterProcess (Prozess), contentTitleProcess (Prozess), contentDescriptionProcess (Prozess)
+
+#Processes grants: usePermissions (bool), grantCreate=true (bool), grantCreateProcess (Prozess), grantUpdate=true (bool), grantUpdateProcess (Prozess), grantDelete=true (bool), grantDeleteProcess (Prozess)
+
+#Color: color, colorProcess (Prozess)
+
+#Icon: icon, iconProcess (Prozess), image, imageProcess (Prozess), iconId, iconIdProcess (Prozess)
+
+Feld Properties (entityField):
+
+#General: name, title, titleProcess (Prozess), descriptionField, documentation
+
+#Database: linkedContext, linkedContextProcess (Prozess), consumer
+
+#Tool tip: tooltip, tooltipProcess (Prozess)
+
+#Placeholder: placeholder, placeholderProcess (Prozess)
+
+#Processes: valueProcess (Prozess), displayValueProcess (Prozess), onValidation (Prozess), onValueChange (Prozess), onValueChangeTypes=MASK|PROCESS|PROCESS_SETVALUE, compareChangesWithRecordField (bool)
+
+#Value List: dropDownProcess, textInputAllowed (bool)
+
+#Processing grants: usePermissions (bool)
+
+#Color: color, colorProcess (Prozess)
+
+#Activity: state=AUTO, stateProcess (Prozess)
+
+#Required field: mandatory (bool), mandatoryProcess (Prozess)
+
+#Single selection: selectionMode=SINGLE, selectionModeProcess (Prozess)
+
+#Search: groupable (bool), preferredGroupOrder=DISPLAYVALUE
+
+#Content Type: contentType=TEXT, contentTypeProcess (Prozess)
+
+#Formatting: maxFieldSize, resolution, outputFormat, inputFormat
+
+Action Properties (entityActionField):
+
+#General: name, title, titleProcess, description, documentation
+
+#Tool tip: tooltip, tooltipProcess
+
+#Processing grants: usePermissions
+
+#Activity: state=EDITABLE, stateProcess
+
+#Icon: iconId, iconIdProcess
+
+#Action: onActionProcess (Prozess), shortcut, isMenuAction=true (bool), isObjectAction=true (bool), selectionType=UNBOUND, isSaveAction (bool)
+
+Provider Properties (entityProvider):
+
+#General: name, titlePlural, titlePluralProcess, description, documentation, dependencies, lookupIdfield, uniqueProviderKeyProcess (Prozess)
+
+#Source: recordcontainer, targetContextField, targetIdField, targetConsumerProcess (Prozess), useAggregates (bool), sortingField
+
+#Processing grants: usePermissions (bool)
+
+#Search: filterVariablesProcess (Prozess), initFilterMergeMode=AND
+
+Consumer Properties (entityConsumer):
+
+#General: title, description, documentation, entityName, fieldName, refreshParent (bool), isOneToOneRelationship (bool)
+
+#Processes: onValidation (Prozess), externalInitFilterProcess (Prozess)
+
+#Activity: state=EDITABLE, stateProcess (Prozess)
+
+#Single selection: selectionMode=SINGLE, selectionModeProcess (Prozess)
+
+Record Container (dbRecordContainer):
+
+#General: title, type=dbRecordContainer, description, documentation
+
+#Database: alias, linkInformation, maximumDbRows, isPageable=true (bool), isReadOnly (bool), isRequireContainerFiltering (bool), hasDependentRecords (bool), fromClauseProcess (Prozess), conditionProcess (Prozess), orderClauseProcess (Prozess), onDBInsert (Prozess), onDBUpdate (Prozess), onDBDelete (Prozess)
+
+(Hinweis: Templates innerhalb von Views wie tableViewTemplate, genericViewTemplate teilen sich Standardfelder wie title, devices, entityField=#ENTITY. Diese sollen ausklappbar unter der View-Detailansicht mit ihrem exakten Diff dargestellt werden).

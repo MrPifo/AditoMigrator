@@ -1,6 +1,6 @@
 {
   "name": "adito-migrator",
-  "version": "1.1",
+  "version": "1.3",
   "main": "index.html",
   "window": {
     "title": "ADITO Migrator v1.1",

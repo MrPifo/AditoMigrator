@@ -2,12 +2,9 @@
 <html lang="de" data-bs-theme="dark">
 <head>
 <meta charset="UTF-8">
-<title>ADITO Migrator v14.0 - Inspector Edition</title>
+<title>ADITO Migrator v1.3</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
-<script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
-<script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
-<script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
@@ -53,11 +50,7 @@
     
     .prop-row { transition: background 0.1s; }
     .prop-row:hover { background: rgba(255,255,255,0.03); }
-    .is-process { text-decoration: underline; text-decoration-style: dotted; color: #58a6ff; cursor: pointer; }
-    .is-process:hover { color: #79c0ff; }
-    
-    .d2h-file-wrapper { border: none; margin-bottom: 0; border-radius: 0; }
-    .d2h-file-header { display: none; }
+    .prop-row-interactive:hover { background: rgba(88, 166, 255, 0.1); cursor: pointer; }
     
     .view-tpl-header { cursor: pointer; transition: background 0.1s; }
     .view-tpl-header:hover { background: #21262d !important; }
@@ -66,12 +59,34 @@
     
     .prop-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; margin-bottom: 15px; }
     .prop-box-header { background: rgba(0,0,0,0.2); border-bottom: 1px solid #30363d; padding: 6px 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #c9d1d9; }
+
+    /* --- Eigene Custom Scrollbars --- */
+    ::-webkit-scrollbar { width: 12px; height: 12px; }
+    ::-webkit-scrollbar-track { background: #0d1117; border-left: 1px solid #30363d; border-top: 1px solid #30363d; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 6px; border: 2px solid #0d1117; }
+    ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+    ::-webkit-scrollbar-corner { background: #0d1117; }
+
+    /* --- Scroll & Viewport Fixes für Diff2Html --- */
+    #diff-view-container { flex: 1; min-height: 0; overflow: hidden; }
+    #diff-view-container.d-flex { display: flex !important; }
+    #diff-html-target { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+    
+    .d2h-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin: 0; }
+    .d2h-file-wrapper { flex: 1 !important; display: flex !important; flex-direction: column; min-height: 0; overflow: hidden; margin: 0 !important; border: none !important; border-radius: 0 !important; }
+    .d2h-files-diff { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+    
+    .d2h-file-side-diff { flex: 1 1 50%; overflow: auto !important; min-height: 0; position: relative; }
+    .d2h-code-wrapper { overflow: visible !important; width: max-content !important; min-width: 100%; height: auto !important; }
+    
+    /* Blende Diff2Html Header, Checkboxen, und Tags (wie RENAMED) komplett aus */
+    .d2h-file-header, .d2h-file-list-wrapper, .d2h-file-name-wrapper, .d2h-icon, .d2h-tag { display: none !important; }
 </style>
 </head>
 <body>
 
 <header class="d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background: #161b22; border-color: #30363d !important;">
-    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v14.0</div>
+    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.3</div>
     <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
     <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
    
@@ -80,12 +95,12 @@
             <option value="">Warte auf Projekte...</option>
         </select>
         <button class="btn btn-sm btn-primary ms-2" onclick="startAnalysis()" id="btn-analyze" disabled title="Entity analysieren"><i class="fa-solid fa-play"></i></button>
-        <button class="btn btn-sm btn-outline-info ms-1 d-none" onclick="reloadEntity()" id="btn-reload" title="Entity neu laden"><i class="fa-solid fa-rotate"></i></button>
+        <button class="btn btn-sm btn-outline-info ms-1 d-none" onclick="reloadEntity()" id="btn-reload" title="Kompletten Reload erzwingen"><i class="fa-solid fa-rotate"></i></button>
     </div>
 
     <div class="ms-auto d-flex gap-3 text-secondary small align-items-center">
         <span title="Eigene Projekt-Anpassung"><span class="badge badge-custom shadow-sm"><i class="fa-solid fa-wrench"></i> CUSTOM</span></span>
-        <span title="Extension Point Injection"><span class="badge shadow-sm text-dark" style="background-color: #ff79c6;">EXT</span></span>
+        <span title="Enthält Modifikationen"><i class="fa-solid fa-wrench" style="color: #d2a8ff; opacity: 0.8;"></i> Modifiziert</span>
         <span class="border-start border-secondary h-50 mx-1"></span>
         <span><div class="status-dot d-inline-block" style="background:#8b949e;"></div> Modular-Only</span>
         <span><div class="status-dot d-inline-block" style="border:1px solid #30363d; background:transparent;"></div> Gleich</span>
@@ -109,7 +124,7 @@
                 <span class="small text-secondary" id="file-status">Keine Projekte.</span>
             </div>
             <div class="form-check form-switch mb-0 align-self-start ms-1">
-                <input class="form-check-input" type="checkbox" id="ignoreTitleToggle" onchange="renderTree()" checked>
+                <input class="form-check-input" type="checkbox" id="ignoreTitleToggle" onchange="renderTree()">
                 <label class="form-check-label text-secondary" style="font-size: 11px;" for="ignoreTitleToggle">Ignore 'title' diffs</label>
             </div>
         </div>
@@ -120,16 +135,23 @@
         <div class="p-2 border-bottom d-flex align-items-center justify-content-between" style="background: #161b22; border-color: #30363d !important;">
             <div id="view-title" class="fw-bold" style="color: #c9d1d9;">Bitte ein Element auswählen</div>
             
-            <div id="diff-toolbar" class="d-none align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()" title="Source Pfade ein/ausblenden"><i class="fa-solid fa-bug"></i> Debug</button>
-                <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()" title="Prozess neu laden"><i class="fa-solid fa-rotate"></i></button>
-                <div class="btn-group btn-group-sm shadow-sm me-3" id="mode-toggle">
-                    <button class="btn btn-secondary" id="btn-mode-core" onclick="setDiffMode('core')">Modul Core</button>
-                    <button class="btn btn-outline-custom" id="btn-mode-custom" onclick="setDiffMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
+            <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm shadow-sm me-3 d-none" id="mode-toggle">
+                    <button class="btn btn-secondary" id="btn-mode-core" onclick="setMode('core')">Modul Core</button>
+                    <button class="btn btn-custom" id="btn-mode-custom" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
                 </div>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Orig.</button>
-                    <button class="btn btn-outline-secondary" id="copy-btn-2" onclick="copySource(2)"><i class="fa-regular fa-copy"></i> Modul</button>
+                
+                <div id="diff-toolbar" class="d-none align-items-center gap-2 border-start border-secondary ps-3 ms-1">
+                    <div class="form-check form-switch me-3 mb-0 text-light d-flex align-items-center">
+                        <input class="form-check-input mt-0 me-2" type="checkbox" id="rawDiffToggle" onchange="setDiffMode(state.currentMode)" style="width: 3em; height: 1.5em; cursor: pointer;">
+                        <label class="form-check-label fw-bold" for="rawDiffToggle" title="Schaltet die detaillierte Diff-Markierung aus und zeigt die Prozesse roh nebeneinander" style="font-size: 14px; cursor: pointer; padding-top: 2px;">Raw Mode</label>
+                    </div>
+                    <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()" title="Source Pfade ein/ausblenden"><i class="fa-solid fa-bug"></i> Debug</button>
+                    <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()" title="Prozess neu laden"><i class="fa-solid fa-rotate"></i></button>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Orig.</button>
+                        <button class="btn btn-outline-secondary" id="copy-btn-2" onclick="copySource(2)"><i class="fa-regular fa-copy"></i> Modul</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -155,21 +177,55 @@
             <div class="diff-pane" id="pane2"></div>
         </div>
 
-        <div id="diff-view-container" class="d-none flex-column flex-grow-1 overflow-hidden">
-            <div id="diff-html-target" class="flex-grow-1 overflow-auto bg-dark"></div>
+        <div id="diff-view-container" class="d-none flex-column">
+            <div id="diff-html-target" class="bg-dark"></div>
         </div>
     </div>
 </main>
 
 <script>
-// --- NW.JS APIS ---
+// --- NW.JS APIS & HELPERS ---
 const fs = typeof require !== 'undefined' ? require('fs') : null;
 const path = typeof require !== 'undefined' ? require('path') : null;
 const S = (id) => document.getElementById(id);
 const escapeHtml = (unsafe) => unsafe ? unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
 
+// Case-Insensitive Helpers
+function getUniqueNamesCI(arr1, arr2) {
+    let map = new Map();
+    (arr1 || []).forEach(x => { if(x && x.name) map.set(x.name.toLowerCase(), x.name); });
+    (arr2 || []).forEach(x => { if(x && x.name) map.set(x.name.toLowerCase(), x.name); });
+    return Array.from(map.values());
+}
+function findCaseInsensitive(arr, name) {
+    if(!arr || !name) return undefined;
+    const lower = name.toLowerCase();
+    return arr.find(x => x && x.name && x.name.toLowerCase() === lower);
+}
+function getUniqueStringCI(arr1, arr2) {
+    let map = new Map();
+    (arr1 || []).forEach(x => map.set(x.toLowerCase(), x));
+    (arr2 || []).forEach(x => map.set(x.toLowerCase(), x));
+    return Array.from(map.values());
+}
+function getTplCI(tplMap, name) {
+    if (!tplMap || !name) return undefined;
+    let key = Object.keys(tplMap).find(k => k.toLowerCase() === name.toLowerCase());
+    return key ? tplMap[key] : undefined;
+}
+function getRefsCI(refsObj, name) {
+    let res = new Set();
+    if(!refsObj || !name) return res;
+    let lower = name.toLowerCase();
+    Object.keys(refsObj).forEach(k => {
+        if(k.toLowerCase() === lower) refsObj[k].forEach(v => res.add(v));
+    });
+    return res;
+}
+
 // --- METADATA DICTIONARY ---
-const ADITO_PROCESS_NAMES = new Set(["titleProcess", "linkedContextProcess", "tooltipProcess", "placeholderProcess", "valueProcess", "displayProcess", "displayValueProcess", "onValidation", "onValueChange", "dropDownProcess", "colorProcess", "stateProcess", "mandatoryProcess", "selectionModeProcess", "contentTypeProcess", "expression", "iconProcess", "onInit", "afterUIiInit", "beforeOperatingState", "afterOperatingState", "afterSave", "initFilterProcess", "contentTitleProcess", "contentDescriptionProcess", "grantCreateProcess", "grantUpdateProcess", "grantDeleteProcess", "imageProcess", "iconIdProcess", "uniqueProviderKeyProcess", "targetConsumerProcess", "filterVariablesProcess", "onActionProcess", "process", "filterConditionProcess", "fromClauseProcess", "conditionProcess", "orderClauseProcess", "onDBInsert", "onDBUpdate", "onDBDelete", "filterFieldsProcess", "filterValuesProcess", "recordContainerProcess", "contentProcess", "groupQueryProcess", "patternExtensionProcess", "boostPatternProcess", "defaultAction", "rowCountProcess", "onInsert", "onUpdate", "onDelete", "cacheKeyProcess", "titlePluralProcess", "externalInitFilterProcess"]);
+const ADITO_PROCESS_NAMES_ARR = ["titleProcess", "linkedContextProcess", "tooltipProcess", "placeholderProcess", "valueProcess", "displayProcess", "displayValueProcess", "onValidation", "onValueChange", "dropDownProcess", "colorProcess", "stateProcess", "mandatoryProcess", "selectionModeProcess", "contentTypeProcess", "expression", "iconProcess", "onInit", "afterUIiInit", "beforeOperatingState", "afterOperatingState", "afterSave", "initFilterProcess", "contentTitleProcess", "contentDescriptionProcess", "grantCreateProcess", "grantUpdateProcess", "grantDeleteProcess", "imageProcess", "iconIdProcess", "uniqueProviderKeyProcess", "targetConsumerProcess", "filterVariablesProcess", "onActionProcess", "process", "filterConditionProcess", "fromClauseProcess", "conditionProcess", "orderClauseProcess", "onDBInsert", "onDBUpdate", "onDBDelete", "filterFieldsProcess", "filterValuesProcess", "recordContainerProcess", "contentProcess", "groupQueryProcess", "patternExtensionProcess", "boostPatternProcess", "defaultAction", "rowCountProcess", "onInsert", "onUpdate", "onDelete", "cacheKeyProcess", "titlePluralProcess", "externalInitFilterProcess"];
+const ADITO_PROCESS_NAMES = new Set(ADITO_PROCESS_NAMES_ARR);
 const XML_WRAPPERS = new Set(["entityFields", "recordContainers", "recordFieldMappings", "implementations", "children", "filterExtensions"]);
 const IGNORE_AS_PROPS = new Set([...XML_WRAPPERS, "modelValueWrapper", "stringValueWrapper"]);
 
@@ -210,46 +266,19 @@ const UI_CONFIG = {
 
 const DESIGNER_ORDER = ['recordContainer', 'entityField', 'entityParameter', 'entityProvider', 'entityConsumer', 'entityActionField', 'entityActionGroup', 'entityServiceDefinition', 'filterExtension'];
 
+window._nodeRegistry = {};
+function registerNodePair(o, m) { let id = (m?.id || o?.id); window._nodeRegistry[id] = { o, m }; return id; }
+window.triggerDiffFromProp = function(rId, p) { let d = window._nodeRegistry[rId]; loadDiff(p, d.o?.procs?.[p], d.m?.procs?.[p], d.m, d.o); }
+
 // --- PROJECT ENGINE ---
 class AditoProject {
-    constructor(path, name) { this.rootPath = path; this.name = name; this.files = new Map(); this.entities = new Set(); this.contextMap = new Map(); this.viewRefs = {}; this.viewRoles = {}; this.knownLibraries = new Map(); this.contextViews = new Map(); }
+    constructor(path, name) { this.rootPath = path; this.name = name; this.files = new Map(); this.entities = new Set(); this.contextMap = new Map(); this.viewRefs = {}; this.viewRoles = {}; this.contextViews = new Map(); this.customViewsMod = new Set(); }
     
     async index() {
-        if (!fs) return; this.files.clear(); this._walk(this.rootPath);
+        if (!fs) return; 
+        this.files.clear(); this.entities.clear(); this.contextMap.clear(); this.viewRefs = {}; this.viewRoles = {}; this.contextViews.clear(); this.customViewsMod.clear();
+        this._walk(this.rootPath);
         
-        for (const [key, obj] of this.files.entries()) {
-            if (key.includes('/process/') && key.endsWith('.aod')) {
-                const xml = await this.readXml(obj.fullPath);
-                if (xml && xml.nodeName === 'process') {
-                    let libNode = xml.getElementsByTagName('name')[0];
-                    let procNode = xml.getElementsByTagName('process')[0];
-                    let libName = libNode ? libNode.textContent.trim() : path.basename(obj.fullPath, '.aod');
-                    let exports = new Set();
-                    if (procNode) {
-                        let procPath = procNode.textContent.trim();
-                        let jsFile = null;
-                        if (procPath === 'process.js' || procPath === './process.js') {
-                            let expectedJs = path.join(path.dirname(obj.fullPath), 'process.js');
-                            jsFile = Array.from(this.files.values()).find(f => f.fullPath === expectedJs);
-                        } else { jsFile = this.findFile(procPath); }
-                        
-                        if (jsFile) {
-                            let jsContent = await this.readText(jsFile.fullPath);
-                            if (jsContent) {
-                                let exRegex = /export\s+(?:default\s+)?(?:function|const|let|var|class)\s+([a-zA-Z0-9_$]+)/g;
-                                let m; while((m = exRegex.exec(jsContent)) !== null) exports.add(m[1]);
-                                let blockRegex = /export\s+{([^}]+)}/g;
-                                while((m = blockRegex.exec(jsContent)) !== null) {
-                                    m[1].split(',').forEach(item => { let clean = item.split(' as ')[0].trim(); if(clean) exports.add(clean); });
-                                }
-                            }
-                        }
-                    }
-                    this.knownLibraries.set(libName, exports);
-                }
-            }
-        }
-
         for (const [key, obj] of this.files.entries()) {
             if (key.endsWith('_entity.aod') && key.includes('entity/')) {
                 this.entities.add(path.basename(obj.fullPath, '.aod'));
@@ -285,6 +314,34 @@ class AditoProject {
                 }
             }
         }
+
+        for (const [key, obj] of this.files.entries()) {
+            if (key.includes('modification/') && key.endsWith('.aod')) {
+                const txt = await this.readText(obj.fullPath);
+                if (txt && txt.includes('<modelType>neonContext</modelType>')) {
+                    const ctxMatch = txt.match(/<modelName>([^<]+)<\/modelName>/);
+                    if (ctxMatch) {
+                        const ctxName = ctxMatch[1];
+                        const entName = [...this.contextMap.entries()].find(([e, c]) => c === ctxName)?.[0];
+                        if (entName) {
+                            let vSet = this.contextViews.get(entName);
+                            if(!vSet) { vSet = new Set(); this.contextViews.set(entName, vSet); }
+                            
+                            let pathMatch = txt.match(/<path>[^\/]+\/(mainView|filterView|editView|previewView|previewMultipleView|lookupView)<\/path>/);
+                            
+                            let viewMatches = [...txt.matchAll(/<(?:view|value)>([^<]+_view)<\/(?:view|value)>/g)];
+                            viewMatches.forEach(m => {
+                                let vName = m[1].trim(); vSet.add(vName);
+                                if(!this.viewRefs[vName]) this.viewRefs[vName] = new Set();
+                                this.viewRefs[vName].add(`Context: ${ctxName}`);
+                                if(pathMatch) this.viewRoles[vName] = pathMatch[1];
+                                this.customViewsMod.add(vName);
+                            });
+                        }
+                    }
+                }
+            }
+        }
     }
     
     _walk(dir) {
@@ -295,10 +352,6 @@ class AditoProject {
             } else { 
                 let relP = fp.substring(this.rootPath.length + 1).replace(/\\/g, '/');
                 this.files.set(relP.toLowerCase(), { path: relP, fullPath: fp }); 
-                if(relP.includes('/process/') && file.endsWith('.js')) {
-                    let bName = file.replace('.js', '');
-                    if(!this.knownLibraries.has(bName)) this.knownLibraries.set(bName, new Set());
-                }
             }
         }); } catch (e) {}
     }
@@ -308,7 +361,7 @@ class AditoProject {
 }
 
 let projOrig = null, projMod = null;
-let state = { origData: null, modData: null, diffViewInfo: null, treeState: { expanded: new Set(), activeId: null }, currentViewXml: {} };
+let state = { origData: null, modData: null, diffViewInfo: null, currentMode: 'custom', treeState: { expanded: new Set(), activeId: null }, currentViewXml: {} };
 
 async function loadProject(inputEl, projRefName, btnId) {
     if(!inputEl.value) return;
@@ -335,31 +388,15 @@ function checkReady() {
 class TreeNode {
     constructor(name, type, file, id) { 
         this.id = id; this.name = name; this.type = type; this.file = file; 
-        this.props = {}; this.procs = {}; this.procContents = {}; this.coreProcContents = {}; this.procErrors = {}; this.children = []; 
-        this.isCustom = false; this.isDeleted = false; this.isExt = false; this.rawXml = null; this.refContexts = [];
+        this.props = {}; this.coreProps = {};
+        this.procs = {}; this.coreProcs = {};
+        this.procContents = {}; this.coreProcContents = {}; 
+        this.children = []; 
+        this.isCustom = false;
+        this.customProps = new Set();
+        this.customProcs = new Set();
+        this.isDeleted = false; this.isExt = false; this.rawXml = null; 
     }
-}
-
-function checkImports(content, knownLibs) {
-    let errs = []; if (!content) return errs;
-    let matches = [...content.matchAll(/import\s+(?:{\s*([^}]+)\s*}|([a-zA-Z0-9_$]+|\*\s+as\s+[a-zA-Z0-9_$]+))\s+from\s+["']([^"']+)["']/g)];
-    for(let m of matches) {
-        let lib = m[3]; 
-        if (lib.startsWith('@aditosoftware/') || lib.startsWith('.')) continue;
-        
-        let libKey = knownLibs.has(lib) ? lib : lib.replace('.js', '');
-        if (!knownLibs.has(libKey)) {
-            errs.push(`Library '${lib}' fehlt`);
-            continue;
-        }
-        
-        let exportsSet = knownLibs.get(libKey);
-        if (m[1] && exportsSet.size > 0) { 
-            let imports = m[1].split(',').map(s => s.split(' as ')[0].trim()).filter(s => s);
-            imports.forEach(imp => { if (!exportsSet.has(imp)) errs.push(`'${imp}' fehlt in '${lib}'`); });
-        }
-    }
-    return [];
 }
 
 function extractTemplates(xml) {
@@ -388,10 +425,50 @@ function extractTemplates(xml) {
             } else if(val==="") { if(sub.hasAttribute('v')) val = sub.getAttribute('v'); else if(sub.hasAttribute('value')) val = sub.getAttribute('value'); }
             props[sub.nodeName] = val;
         });
-        while(tpls[name]) name += "_dup";
+        while(getTplCI(tpls, name)) name += "_dup";
         tpls[name] = { type: type, props: props };
     });
     return tpls;
+}
+
+function harmonizeExtensionPointsRecursive(origNode, modNode) {
+    if (!origNode || !modNode) return;
+
+    function alignToExt(sourceNode, targetNode) {
+        let targetExts = targetNode.children.filter(c => c.isExt);
+        targetExts.forEach(tExt => {
+            tExt.children.forEach(tChild => {
+                let sIdx = sourceNode.children.findIndex(c => c.name.toLowerCase() === tChild.name.toLowerCase() && c.type === tChild.type && !c.isExt);
+                if (sIdx > -1) {
+                    let sChild = sourceNode.children.splice(sIdx, 1)[0];
+                    let sExt = sourceNode.children.find(c => c.name.toLowerCase() === tExt.name.toLowerCase() && c.isExt);
+                    if (!sExt) {
+                        sExt = new TreeNode(tExt.name, tExt.type, sourceNode.file, sourceNode.id + '_' + tExt.name);
+                        sExt.isExt = true;
+                        sourceNode.children.push(sExt);
+                    }
+                    sExt.children.push(sChild);
+                }
+            });
+        });
+    }
+
+    alignToExt(origNode, modNode);
+    alignToExt(modNode, origNode);
+
+    origNode.children.forEach(oChild => {
+        let mChild = findCaseInsensitive(modNode.children, oChild.name);
+        if (mChild && mChild.type === oChild.type) harmonizeExtensionPointsRecursive(oChild, mChild);
+    });
+}
+
+function hasCustomModDescendant(node) {
+    if (!node) return false;
+    if (node.customProcs?.size > 0 || node.customProps?.size > 0) return true;
+    for (let c of node.children || []) {
+        if (c.isCustom || hasCustomModDescendant(c)) return true;
+    }
+    return false;
 }
 
 async function startAnalysis() { if(!S('entitySelect').value) return; state.treeState = { expanded: new Set(), activeId: null }; await performAnalysis(); }
@@ -399,6 +476,13 @@ async function reloadEntity() {
     if(!S('entitySelect').value) return;
     state.treeState.expanded.clear(); document.querySelectorAll('.tree-row:not(.collapsed)').forEach(el => { if(el.dataset.id) state.treeState.expanded.add(el.dataset.id); });
     let active = document.querySelector('.tree-row.active'); state.treeState.activeId = active ? active.dataset.id : null;
+    
+    S('tree-container').innerHTML = '<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Re-Indexierung der Projekte...</div>';
+    await new Promise(r => setTimeout(r, 50));
+    
+    if (projOrig) await projOrig.index();
+    if (projMod) await projMod.index();
+
     await performAnalysis();
 }
 
@@ -406,7 +490,13 @@ async function performAnalysis() {
     const entName = S('entitySelect').value;
     S('tree-container').innerHTML = '<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Lese Dateien & analysiere Code...</div>';
     await new Promise(r => setTimeout(r, 50));
-    state.origData = await buildData(projOrig, entName); state.modData = await buildData(projMod, entName); renderTree();
+    
+    state.origData = await buildData(projOrig, entName); 
+    state.modData = await buildData(projMod, entName); 
+    
+    harmonizeExtensionPointsRecursive(state.origData.entity, state.modData.entity);
+    
+    renderTree();
 }
 
 async function buildData(project, entName) {
@@ -428,11 +518,14 @@ async function buildData(project, entName) {
             if(xml) { res.context = new TreeNode(ctxName, "neonContext", fileObj, 'root_ctx'); await extractNodeDataAsync(xml, res.context, project); }
         } else if (key.includes('neonview/')) {
             let vName = path.basename(fileObj.fullPath, '.aod');
-            if (allowedViews.has(vName)) {
+            let isAllowed = Array.from(allowedViews).some(v => v.toLowerCase() === vName.toLowerCase());
+            if (isAllowed) {
                 const xml = await project.readXml(fileObj.fullPath);
                 if(xml) { 
                     let vn = new TreeNode(vName, "neonView", fileObj, 'view_'+vName); vn.rawXml = xml; 
-                    if(project.viewRefs[vName]) vn.refContexts = Array.from(project.viewRefs[vName]);
+                    let isModCust = Array.from(project.customViewsMod).some(v => v.toLowerCase() === vName.toLowerCase());
+                    if(isModCust) vn.isCustom = true;
+                    vn.refContexts = Array.from(getRefsCI(project.viewRefs, vName));
                     await extractNodeDataAsync(xml, vn, project); res.views.push(vn); 
                 }
             }
@@ -447,7 +540,10 @@ async function buildData(project, entName) {
                     const modTarget = xml.getElementsByTagName('modelName')[0]?.textContent;
                     if(modTarget) {
                         if (modTarget.toLowerCase() === entLower) await applyModAsync(xml, res.entity, fileObj, project);
-                        else { let targetView = res.views.find(v => v.name === modTarget); if(targetView) { targetView.isCustom = !fileObj.path.includes('node_modules'); } }
+                        else { 
+                            let targetView = findCaseInsensitive(res.views, modTarget);
+                            if(targetView) { targetView.isCustom = !fileObj.path.includes('node_modules'); } 
+                        }
                     }
                 }
             }
@@ -476,7 +572,6 @@ async function extractNodeDataAsync(xml, targetNode, project) {
                 
                 if(f) {
                     let content = await project.readText(f.fullPath); targetNode.procContents[c.nodeName] = content;
-                    let errs = checkImports(content, project.knownLibraries); if(errs.length > 0) targetNode.procErrors[c.nodeName] = errs;
                 }
             } else targetNode.props[c.nodeName] = val;
         }
@@ -499,7 +594,7 @@ async function parseWalkerAsync(xml, parentTree, fileObj, isCustom, project) {
         if (nameNode && !IGNORE_AS_PROPS.has(c.nodeName)) {
             let type = c.nodeName; if(type.endsWith('RecordContainer')) type = 'recordContainer'; if(type.endsWith('RecordFieldMapping') || type === 'consumerMapping') type = 'recordFieldMapping';
             let node = new TreeNode(nameNode.textContent.trim(), type, fileObj, parentTree.id + '_' + nameNode.textContent.trim());
-            node.isCustom = isCustom; if(parentTree.type === 'ExtensionPoint') node.isExt = true;
+            node.isCustom = isCustom;
             await extractNodeDataAsync(c, node, project); parentTree.children.push(node); await parseWalkerAsync(c, node, fileObj, isCustom, project);
         }
     }
@@ -507,22 +602,36 @@ async function parseWalkerAsync(xml, parentTree, fileObj, isCustom, project) {
 
 async function applyModAsync(xml, rootTree, fileObj, project) {
     const cType = xml.getElementsByTagName('changeType')[0]?.textContent; const pathTxt = xml.getElementsByTagName('path')[0]?.textContent || "";
-    const pathParts = pathTxt.split('/').filter(p => !XML_WRAPPERS.has(p) && p !== rootTree.name);
+    const pathParts = pathTxt.split('/').filter(p => !XML_WRAPPERS.has(p) && p.toLowerCase() !== rootTree.name.toLowerCase());
     const isCustom = !fileObj.path.includes('node_modules');
-    const findNode = (pathArr) => { let curr = rootTree; for(let p of pathArr) { let next = curr.children.find(c => c.name === p); if(!next) return null; curr = next; } return curr; };
+    const findNode = (pathArr) => { 
+        let curr = rootTree; 
+        for(let p of pathArr) { 
+            let next = findCaseInsensitive(curr.children, p); 
+            if(!next) return null; curr = next; 
+        } 
+        return curr; 
+    };
 
     if (cType === 'MODIFY') {
         const propName = pathParts.pop(); let target = findNode(pathParts);
         if(target) {
             let valNode = xml.getElementsByTagName('value')[0]; let val = valNode ? getDeepValue(valNode) : "";
+            
+            if (Object.keys(target.coreProps).length === 0) Object.assign(target.coreProps, target.props);
+
             if(ADITO_PROCESS_NAMES.has(propName)) {
-                target.coreProcContents[propName] = target.procContents[propName]; target.procs[propName] = val; 
+                target.coreProcContents[propName] = target.procContents[propName];
+                target.coreProcs[propName] = target.procs[propName];
+                target.procs[propName] = val; 
                 let f = project.findFile(val); if(f) {
                     let content = await project.readText(f.fullPath); target.procContents[propName] = content;
-                    let errs = checkImports(content, project.knownLibraries); if(errs.length > 0) target.procErrors[propName] = errs;
                 }
-            } else target.props[propName] = val;
-            if(isCustom) target.isCustom = true;
+                if(isCustom) target.customProcs.add(propName);
+            } else {
+                target.props[propName] = val;
+                if(isCustom) target.customProps.add(propName);
+            }
         }
     } else if (cType === 'INSERT') {
         const wrappers = xml.getElementsByTagName('modelValueWrapper');
@@ -534,107 +643,23 @@ async function applyModAsync(xml, rootTree, fileObj, project) {
 }
 
 function normalizeStr(s) { return (s||"").replace(/\s+/g, ''); }
+function sortProcs(a,b) { let iA = ADITO_PROCESS_NAMES_ARR.indexOf(a); let iB = ADITO_PROCESS_NAMES_ARR.indexOf(b); if(iA===-1) iA=999; if(iB===-1) iB=999; return iA - iB; }
 
 // --- RENDER HIERARCHY ---
-function createUiRow(ind, ic, txt, st, cust, ext, col, id, extraHTML = "") {
-    const d = document.createElement('div'); d.className = 'tree-row'; d.style.paddingLeft = `${(ind * 20) + 10}px`; if(id) d.dataset.id = id;
-    d.dataset.st = st;
-    const isDull = (st === 'E' || st === 'N');
-    let sC = 'transparent', bdr = 'none';
-    if(st === 'N') sC = '#8b949e'; else if(st === 'D') sC = '#f85149'; else if(st === 'C') sC = '#d29922'; else if(st === 'P') { sC = 'transparent'; bdr = '2px solid #d29922'; } else if(st === 'E') { sC = 'transparent'; bdr = '1px solid #30363d'; }
-    const textCol = isDull ? '#8b949e' : '#c9d1d9'; const iconOp = isDull ? '0.6' : '1';
-    const bC = cust ? `<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>` : '';
-    const bE = ext ? `<span class="badge shadow-sm ms-1 text-dark" style="font-size:9px; background-color:#ff79c6;">EXT</span>` : '';
-    d.innerHTML = `<i class="fa-solid fa-caret-down toggle-icon"></i><span class="status-dot" style="background:${sC}; border:${bdr}; box-sizing: border-box;"></span><i class="fa-solid ${ic} icon-col" style="color:${col}; opacity:${iconOp};"></i><span class="node-text" style="color:${textCol};">${txt} ${bC} ${bE} ${extraHTML}</span>`;
-    return d;
-}
-
-function createUiNode(o, m, indent) {
-    let act = m || o; let st = 'E'; let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
-    
-    let propChanged = false; let procChanged = false;
-    if(!o && m) st = 'N'; else if(o && !m) st = 'D'; else if(m?.isDeleted) st = 'D';
-    else {
-        let oProps = {...o?.props}; let mProps = {...m?.props};
-        if (ignoreTitle) { delete oProps.title; delete mProps.title; }
-        if(JSON.stringify(oProps)!==JSON.stringify(mProps)) propChanged = true;
-        
-        let allP = new Set([...Object.keys(o?.procContents||{}), ...Object.keys(m?.procContents||{})]);
-        for(let p of allP) { if(normalizeStr(o?.procContents[p]) !== normalizeStr(m?.procContents[p])) { procChanged = true; break; } }
-        
-        if(!propChanged && act.type === 'neonView') { 
-            let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
-            if(JSON.stringify(oTpls) !== JSON.stringify(mTpls)) propChanged = true;
-        }
-        if(propChanged) st = 'C'; else if(procChanged) st = 'P';
-    }
-
-    let isCust = m?.isCustom || false; let isExt = m?.isExt || o?.isExt || false;
-    let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' }; if(isExt) conf = UI_CONFIG.ExtensionPoint;
-    
-    let cNames = new Set([...(o?.children||[]).map(n=>n.name), ...(m?.children||[]).map(n=>n.name)]);
-    let pNames = new Set([...Object.keys(o?.procs||{}), ...Object.keys(m?.procs||{})]);
-    
-    let sub = document.createElement('div'); sub.className = 'tree-sub';
-    let childHasC = false, childHasP = false;
-
-    [...pNames].sort((a,b)=>a.localeCompare(b)).forEach(p => {
-        let pst = 'E', op = o?.procContents[p], mp = m?.procContents[p]; 
-        if(!op && mp) { pst = 'N'; childHasP = true; } else if(op && !mp) { pst = 'D'; childHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; childHasP = true; }
-        
-        let errs = m?.procErrors?.[p] || o?.procErrors?.[p] || [];
-        let errHtml = errs.length > 0 ? `<i class="fa-solid fa-triangle-exclamation text-danger ms-2" title="${errs.join('&#10;')}"></i>` : "";
-
-        let pr = createUiRow(indent+1, 'fa-code', p, pst, isCust, false, '#58a6ff', act.id+'_'+p, errHtml);
-        pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
-        pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, o?.procs[p], m?.procs[p], isCust, m, o); };
-        sub.appendChild(pr);
-    });
-
-    [...cNames].sort((a,b)=>a.localeCompare(b)).forEach(cn => { 
-        let childWrap = createUiNode(o?.children.find(c=>c.name===cn), m?.children.find(c=>c.name===cn), indent+1);
-        let cSt = childWrap.querySelector('.tree-row').dataset.st;
-        if(cSt === 'C' || cSt === 'D') childHasC = true;
-        if(cSt === 'P') childHasP = true;
-        if(cSt === 'N' && (st === 'E' || st === 'P')) childHasC = true; 
-        sub.appendChild(childWrap); 
-    });
-
-    if (st === 'E' || st === 'P') {
-        if (childHasC) st = 'C';
-        else if (childHasP && st === 'E') st = 'P';
-    }
-
-    let extraHtml = "";
-    if(act.type === 'neonView') {
-        let role = projMod?.viewRoles?.[act.name] || projOrig?.viewRoles?.[act.name];
-        if(role) extraHtml += `<span class="badge bg-primary ms-2" style="font-size:9px">${role}</span>`;
-        let refs = act.refContexts.length || new Set([ ...(projOrig?.viewRefs[act.name] || []), ...(projMod?.viewRefs[act.name] || []) ]).size;
-        if(refs > 0) extraHtml += `<span class="badge bg-secondary ms-2" style="font-size:9px; border:1px solid #30363d;" title="Referenz-Zähler"><i class="fa-solid fa-link"></i> ${refs}</span>`;
-    }
-
-    let row = createUiRow(indent, conf.i, act.name, st, isCust, isExt, conf.c, act.id, extraHtml);
-    if(!state.treeState.expanded.has(act.id)) row.classList.add('collapsed');
-
-    if(sub.childNodes.length === 0) { row.classList.add('no-children'); row.onclick = () => { activateRow(row); showProps(o, m); }; } 
-    else { row.onclick = (e) => { if(e.target.classList.contains('toggle-icon')) { e.stopPropagation(); row.classList.toggle('collapsed'); } else { activateRow(row); showProps(o, m); } }; }
-
-    let wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(sub); return wrap;
-}
-
 function renderTree() {
     const cont = S('tree-container'); cont.innerHTML = '';
     let ctxNodeOrig = state.origData.context, ctxNodeMod = state.modData.context;
     let entNodeOrig = state.origData.entity, entNodeMod = state.modData.entity;
     let rootWrap = document.createElement('div'); let parentInd = 0;
+
     let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
 
     let viewsSub = document.createElement('div'); viewsSub.className = 'tree-sub';
     let viewsHasC = false, viewsHasP = false;
     if (state.origData.views.length > 0 || state.modData.views.length > 0) {
-        let vNames = new Set([...state.origData.views.map(v=>v.name), ...state.modData.views.map(v=>v.name)]);
-        [...vNames].sort((a,b)=>a.localeCompare(b)).forEach(vn => { 
-            let childWrap = createUiNode(state.origData.views.find(v=>v.name===vn), state.modData.views.find(v=>v.name===vn), parentInd+1);
+        let vNames = getUniqueNamesCI(state.origData.views, state.modData.views);
+        vNames.sort((a,b)=>a.localeCompare(b)).forEach(vn => { 
+            let childWrap = createUiNode(findCaseInsensitive(state.origData.views, vn), findCaseInsensitive(state.modData.views, vn), parentInd+1);
             let cSt = childWrap.querySelector('.tree-row').dataset.st;
             if(cSt === 'C' || cSt === 'D' || cSt === 'N') viewsHasC = true;
             if(cSt === 'P') viewsHasP = true;
@@ -644,6 +669,7 @@ function renderTree() {
 
     let entSt = 'E'; let ePO = {...entNodeOrig?.props}; let ePM = {...entNodeMod?.props};
     if (ignoreTitle) { delete ePO.title; delete ePM.title; }
+    
     if(JSON.stringify(ePO) !== JSON.stringify(ePM)) entSt = 'C';
     else {
         let allEntProcs = new Set([...Object.keys(entNodeOrig?.procContents||{}), ...Object.keys(entNodeMod?.procContents||{})]);
@@ -654,29 +680,39 @@ function renderTree() {
     let entHasC = false, entHasP = false;
 
     let entPNames = new Set([...Object.keys(entNodeOrig?.procs||{}), ...Object.keys(entNodeMod?.procs||{})]);
-    [...entPNames].sort((a,b)=>a.localeCompare(b)).forEach(p => {
-        let pst = 'E', op = entNodeOrig?.procContents[p], mp = entNodeMod?.procContents[p]; 
-        if(!op && mp) { pst = 'N'; entHasP = true; } else if(op && !mp) { pst = 'D'; entHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; entHasP = true; }
-        let errs = entNodeMod?.procErrors?.[p] || entNodeOrig?.procErrors?.[p] || [];
-        let errHtml = errs.length > 0 ? `<i class="fa-solid fa-triangle-exclamation text-danger ms-2" title="${errs.join('&#10;')}"></i>` : "";
-        let pr = createUiRow(parentInd+1, 'fa-code', p, pst, entNodeMod?.isCustom, false, '#58a6ff', entNodeOrig.id+'_'+p, errHtml);
-        pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
-        pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, entNodeOrig?.procs[p], entNodeMod?.procs[p], entNodeMod?.isCustom, entNodeMod, entNodeOrig); };
-        entSub.appendChild(pr);
-    });
+    if(entPNames.size > 0) {
+        let hdrId = 'hdr_entprocs';
+        let hdr = createUiRow(parentInd+1, 'fa-cogs', `Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${entPNames.size}</span>`, 'E', false, false, '#c9d1d9', hdrId);
+        hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
+        let procSub = document.createElement('div'); procSub.className = 'tree-sub';
+        
+        [...entPNames].sort(sortProcs).forEach(p => {
+            let pst = 'E', op = entNodeOrig?.procContents[p], mp = entNodeMod?.procContents[p]; 
+            if(!op && mp) { pst = 'N'; entHasP = true; } else if(op && !mp) { pst = 'D'; entHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; entHasP = true; }
+            let isProcCustom = entNodeMod?.customProcs?.has(p) || false;
+            let pr = createUiRow(parentInd+2, 'fa-code', p, pst, isProcCustom, false, '#58a6ff', entNodeOrig.id+'_'+p, "");
+            pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
+            pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, entNodeOrig?.procs[p], entNodeMod?.procs[p], entNodeMod, entNodeOrig); };
+            procSub.appendChild(pr);
+        });
+        hdr.onclick = () => hdr.classList.toggle('collapsed');
+        entSub.appendChild(hdr); entSub.appendChild(procSub);
+    }
 
     DESIGNER_ORDER.forEach(gType => {
         let oNodes = entNodeOrig?.children.filter(c => c.type === gType || (gType==='recordContainer' && c.type.endsWith('RecordContainer'))) || [];
         let mNodes = entNodeMod?.children.filter(c => c.type === gType || (gType==='recordContainer' && c.type.endsWith('RecordContainer'))) || [];
-        let allN = new Set([...oNodes.map(n=>n.name), ...mNodes.map(n=>n.name)]); if(allN.size === 0) return;
+        
+        let allN = getUniqueNamesCI(oNodes, mNodes); 
+        if(allN.length === 0) return;
 
         let conf = UI_CONFIG[gType] || { i: 'fa-folder', c: '#8b949e', l: gType }; let hdrId = 'hdr_' + gType;
-        let hdr = createUiRow(parentInd+1, conf.i, `${conf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${allN.size}</span>`, 'E', false, false, conf.c, hdrId);
+        let hdr = createUiRow(parentInd+1, conf.i, `${conf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${allN.length}</span>`, 'E', false, false, conf.c, hdrId);
         hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
 
         let sub = document.createElement('div'); sub.className = 'tree-sub';
-        [...allN].sort((a,b)=>a.localeCompare(b)).forEach(n => { 
-            let childWrap = createUiNode(oNodes.find(x=>x.name===n), mNodes.find(x=>x.name===n), parentInd+2); 
+        allN.sort((a,b)=>a.localeCompare(b)).forEach(n => { 
+            let childWrap = createUiNode(findCaseInsensitive(oNodes, n), findCaseInsensitive(mNodes, n), parentInd+2); 
             let cSt = childWrap.querySelector('.tree-row').dataset.st;
             if(cSt === 'C' || cSt === 'D' || cSt === 'N') entHasC = true;
             if(cSt === 'P') entHasP = true;
@@ -701,14 +737,30 @@ function renderTree() {
             if (entSt === 'C' || viewsHasC) st = 'C';
             else if ((entSt === 'P' || viewsHasP) && st === 'E') st = 'P';
         }
-        let cRow = createUiRow(0, UI_CONFIG.neonContext.i, act.name, st, false, false, UI_CONFIG.neonContext.c, act.id);
+        
+        let isCtxCustom = cM?.isCustom || false;
+        let ctxExtraHtml = "";
+        if (!isCtxCustom && hasCustomModDescendant(cM)) {
+            ctxExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
+        }
+        
+        let cRow = createUiRow(0, UI_CONFIG.neonContext.i, act.name, st, isCtxCustom, false, UI_CONFIG.neonContext.c, act.id, ctxExtraHtml);
         cRow.onclick = () => { activateRow(cRow); showProps(cO, cM); }; rootWrap.appendChild(cRow); parentInd = 1;
     }
 
-    let rRow = createUiRow(parentInd, UI_CONFIG.entity.i, entNodeOrig.name, entSt, entNodeMod?.isCustom, false, UI_CONFIG.entity.c, entNodeOrig.id);
-    if(entSub.childNodes.length === 0) { rRow.classList.add('no-children'); rRow.onclick = () => { activateRow(rRow); showProps(entNodeOrig, entNodeMod); }; }
-    else rRow.onclick = (e) => { if(e.target.classList.contains('toggle-icon')) { e.stopPropagation(); rRow.classList.toggle('collapsed'); } else { activateRow(rRow); showProps(entNodeOrig, entNodeMod); } };
-    rootWrap.appendChild(rRow); rootWrap.appendChild(entSub); cont.appendChild(rootWrap);
+    let isEntCustom = entNodeMod?.isCustom || false;
+    let entExtraHtml = "";
+    if (!isEntCustom && hasCustomModDescendant(entNodeMod)) {
+        entExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
+    }
+    
+    let rRow = createUiRow(parentInd, UI_CONFIG.entity.i, entNodeOrig.name, entSt, isEntCustom, false, UI_CONFIG.entity.c, entNodeOrig.id, entExtraHtml);
+    rRow.classList.add('no-children'); 
+    rRow.onclick = () => { activateRow(rRow); showProps(entNodeOrig, entNodeMod); }; 
+    rootWrap.appendChild(rRow);
+    
+    Array.from(entSub.childNodes).forEach(n => rootWrap.appendChild(n));
+    cont.appendChild(rootWrap);
 
     if (viewsSub.childNodes.length > 0) {
         let vSt = 'E'; if (viewsHasC) vSt = 'C'; else if (viewsHasP) vSt = 'P';
@@ -720,37 +772,174 @@ function renderTree() {
     if(state.treeState.activeId) { let aEl = document.querySelector(`[data-id="${state.treeState.activeId}"]`); if(aEl) aEl.click(); }
 }
 
+function createUiNode(o, m, indent) {
+    let act = m || o; let st = 'E'; let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
+    
+    let propChanged = false; let procChanged = false;
+    if(!o && m) { st = 'N'; propChanged = true; } else if(o && !m) { st = 'D'; propChanged = true; } else if(m?.isDeleted) { st = 'D'; propChanged = true; }
+    else {
+        let oProps = {...o?.props}; let mProps = {...m?.props};
+        if (ignoreTitle) { delete oProps.title; delete mProps.title; }
+        if(JSON.stringify(oProps)!==JSON.stringify(mProps)) propChanged = true;
+        
+        let allP = new Set([...Object.keys(o?.procContents||{}), ...Object.keys(m?.procContents||{})]);
+        for(let p of allP) { if(normalizeStr(o?.procContents[p]) !== normalizeStr(m?.procContents[p])) { procChanged = true; break; } }
+        
+        if(!propChanged && act.type === 'neonView') { 
+            let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
+            if(JSON.stringify(oTpls) !== JSON.stringify(mTpls)) propChanged = true;
+        }
+        if(propChanged) st = 'C'; else if(procChanged) st = 'P';
+    }
+
+    let isCust = m?.isCustom || false; let isExt = m?.isExt || o?.isExt || false;
+    let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' }; if(isExt) conf = UI_CONFIG.ExtensionPoint;
+    
+    let cNames = getUniqueNamesCI(o?.children, m?.children);
+    let pNames = new Set([...Object.keys(o?.procs||{}), ...Object.keys(m?.procs||{})]);
+    
+    let sub = document.createElement('div'); sub.className = 'tree-sub';
+    let childHasC = false, childHasP = false;
+
+    [...pNames].sort(sortProcs).forEach(p => {
+        let pst = 'E', op = o?.procContents[p], mp = m?.procContents[p]; 
+        if(!op && mp) { pst = 'N'; childHasP = true; } else if(op && !mp) { pst = 'D'; childHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; childHasP = true; }
+        
+        let isProcCustom = m?.customProcs?.has(p) || false;
+        let pr = createUiRow(indent+1, 'fa-code', p, pst, isProcCustom, false, '#58a6ff', act.id+'_'+p, "");
+        pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
+        pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, o?.procs[p], m?.procs[p], m, o); };
+        sub.appendChild(pr);
+    });
+
+    cNames.sort((a,b)=>a.localeCompare(b)).forEach(cn => { 
+        let childWrap = createUiNode(findCaseInsensitive(o?.children, cn), findCaseInsensitive(m?.children, cn), indent+1);
+        let cSt = childWrap.querySelector('.tree-row').dataset.st;
+        if(cSt === 'C' || cSt === 'D' || cSt === 'N') childHasC = true;
+        if(cSt === 'P') childHasP = true;
+        sub.appendChild(childWrap); 
+    });
+
+    if (st === 'E' || st === 'P') {
+        if (childHasC) { st = 'C'; }
+        else if (childHasP && st === 'E') { st = 'P'; }
+    }
+
+    let extraHtml = "";
+    if (!isCust && hasCustomModDescendant(m)) {
+        extraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
+    }
+
+    if(act.type === 'neonView') {
+        let role = projMod?.viewRoles?.[act.name] || projOrig?.viewRoles?.[act.name];
+        if(role) extraHtml += `<span class="badge bg-primary ms-2" style="font-size:9px">${role}</span>`;
+        let refs = new Set([...getRefsCI(projOrig?.viewRefs, act.name), ...getRefsCI(projMod?.viewRefs, act.name)]).size;
+        if(refs > 0) extraHtml += `<span class="badge bg-secondary ms-2" style="font-size:9px; border:1px solid #30363d;" title="Referenz-Zähler"><i class="fa-solid fa-link"></i> ${refs}</span>`;
+    }
+
+    let row = createUiRow(indent, conf.i, act.name, st, isCust, isExt, conf.c, act.id, extraHtml);
+    if(!state.treeState.expanded.has(act.id)) row.classList.add('collapsed');
+
+    if(sub.childNodes.length === 0) { row.classList.add('no-children'); row.onclick = () => { activateRow(row); showProps(o, m); }; } 
+    else { row.onclick = (e) => { if(e.target.classList.contains('toggle-icon')) { e.stopPropagation(); row.classList.toggle('collapsed'); } else { activateRow(row); showProps(o, m); } }; }
+
+    let wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(sub); return wrap;
+}
+
+function createUiRow(ind, ic, txt, st, cust, ext, col, id, extraHTML = "") {
+    const d = document.createElement('div'); d.className = 'tree-row'; d.style.paddingLeft = `${(ind * 20) + 10}px`; if(id) d.dataset.id = id;
+    d.dataset.st = st;
+    const isDull = (st === 'E' || st === 'N');
+    let sC = 'transparent', bdr = 'none';
+    if(st === 'N') sC = '#8b949e'; else if(st === 'D') sC = '#f85149'; else if(st === 'C') sC = '#d29922'; else if(st === 'P') { sC = 'transparent'; bdr = '2px solid #d29922'; } else if(st === 'E') { sC = 'transparent'; bdr = '1px solid #30363d'; }
+    const textCol = isDull ? '#8b949e' : '#c9d1d9'; const iconOp = isDull ? '0.6' : '1';
+    const bC = cust ? `<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>` : '';
+    const bE = ext ? `<span class="badge shadow-sm ms-1 text-dark" style="font-size:9px; background-color:#ff79c6;">EXT</span>` : '';
+    d.innerHTML = `<i class="fa-solid fa-caret-down toggle-icon"></i><span class="status-dot" style="background:${sC}; border:${bdr}; box-sizing: border-box;"></span><i class="fa-solid ${ic} icon-col" style="color:${col}; opacity:${iconOp};"></i><span class="node-text" style="color:${textCol};">${txt} ${bC} ${bE} ${extraHTML}</span>`;
+    return d;
+}
+
 function toggleAllTree(exp) { document.querySelectorAll('.tree-row:not(.no-children), .group-header').forEach(r => r.classList.toggle('collapsed', !exp)); }
 function activateRow(row) { document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('active')); row.classList.add('active'); }
 
+function setMode(mode) {
+    state.currentMode = mode;
+    S('btn-mode-core').className = mode === 'core' ? 'btn btn-secondary fw-bold' : 'btn btn-outline-secondary';
+    S('btn-mode-custom').className = mode === 'custom' ? 'btn btn-custom fw-bold' : 'btn btn-outline-secondary';
+    
+    if (!S('props-view').classList.contains('d-none')) {
+        let activeRow = document.querySelector('.tree-row.active');
+        if (activeRow && activeRow.dataset.id) {
+            let d = window._nodeRegistry[activeRow.dataset.id];
+            if (d) showProps(d.o, d.m);
+        }
+    } else if (!S('diff-view-container').classList.contains('d-none')) {
+        if (state.diffViewInfo) setDiffMode(mode);
+    }
+}
+
 // --- PROPERTIES / DETAILS ---
 function showProps(o, m) {
-    S('props-view').classList.remove('d-none'); S('diff-view-container').classList.add('d-none'); S('diff-toolbar').classList.add('d-none'); S('debug-banner').classList.add('d-none');
+    S('props-view').classList.remove('d-none'); 
+    S('diff-view-container').classList.add('d-none'); 
+    S('diff-view-container').classList.remove('d-flex'); 
+    S('diff-toolbar').classList.add('d-none'); 
+    S('debug-banner').classList.add('d-none');
+
     let act = m || o; let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' };
     if(act.isExt) conf = UI_CONFIG.ExtensionPoint;
     
+    let hasMods = m && (m.customProps.size > 0 || m.customProcs.size > 0 || m.isCustom);
+    if(hasMods) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
+
     let b = act.isCustom ? `<span class="badge badge-custom ms-2">CUSTOM</span>` : '';
     S('view-title').innerHTML = `<i class="fa-solid ${conf.i} me-2" style="color:${conf.c}"></i> ${act.name} ${b}`;
 
     if(act.type === 'neonView') { renderViews(o, m); return; }
 
-    const dict = PROP_DICTIONARY[act.type] || { groups: {}, defaults: {} }; const defs = dict.defaults || {};
-    const oP = o?.props || {}, mP = m?.props || {};
-    
-    let allDictProps = []; for(let g in dict.groups) allDictProps.push(...dict.groups[g]);
-    let extraProps = new Set([...Object.keys(oP), ...Object.keys(mP)]); allDictProps.forEach(p => extraProps.delete(p));
-    
-    const bTbl = (data, comp, isMod) => {
+    const buildTable = (data, comp, isMod, realO, realM, specType) => {
+        let type = specType || act.type;
+        const dict = PROP_DICTIONARY[type] || { groups: {}, defaults: {} }; const defs = dict.defaults || {};
+        let allDictProps = []; for(let g in dict.groups) allDictProps.push(...dict.groups[g]);
+        let extraProps = new Set([...Object.keys(data), ...Object.keys(comp)]); allDictProps.forEach(p => extraProps.delete(p));
+        
         let h = "";
+        let rId = registerNodePair(realO, realM);
+
         const renderRow = (p) => {
             let v = data[p], cv = comp[p]; if(v===undefined && cv===undefined) v = defs[p];
             let isSet = data[p] !== undefined; 
             let propColor = isSet ? '#e6edf3' : '#6e7681'; let propWeight = isSet ? '600' : 'normal'; let valColor = isSet ? '#c9d1d9' : '#6e7681';
             let valH = v !== undefined ? escapeHtml(v) : ``;
             let diff = v !== cv && (data[p]!==undefined || comp[p]!==undefined);
-            let bClass = diff ? (isMod && act.isCustom ? "subtle-diff-border-custom" : "subtle-diff-border") : "";
-            let tClass = diff ? (isMod && act.isCustom ? 'text-custom fw-bold' : 'text-warning fw-bold') : '';
-            return `<tr class="prop-row"><td class="${bClass}" style="width:35%; border-color:#30363d;"><span style="color:${propColor}; font-weight:${propWeight};">${p}</span></td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${diff?'':valColor};">${valH}</td></tr>`;
+            
+            let isProc = ADITO_PROCESS_NAMES.has(p);
+            let trAttrs = "";
+            let rowHover = "prop-row";
+
+            if (isProc && isSet) {
+                let oC = realO?.procContents?.[p]; 
+                let mC = undefined;
+                if (realM) {
+                    mC = (state.currentMode === 'core' && realM.coreProcContents.hasOwnProperty(p)) ? realM.coreProcContents[p] : realM.procContents[p];
+                }
+
+                let badgeTxt = 'Identisch', badgeCol = '#8b949e', icon = 'fa-check';
+                if (oC && !mC) { badgeTxt = 'Entfernt'; badgeCol = '#f85149'; icon = 'fa-minus'; }
+                else if (!oC && mC) { badgeTxt = 'Neu'; badgeCol = '#3fb950'; icon = 'fa-plus'; }
+                else if (normalizeStr(oC) !== normalizeStr(mC)) { badgeTxt = 'Geändert'; badgeCol = '#d29922'; icon = 'fa-pen'; }
+                
+                valH = `<span class="badge" style="border: 1px solid ${badgeCol}; color: ${badgeCol}; background: transparent;"><i class="fa-solid ${icon}"></i> ${badgeTxt}</span>`;
+                rowHover = "prop-row-interactive";
+                trAttrs = `onclick="window.triggerDiffFromProp('${rId}', '${p}')" title="Klicken für Code-Diff"`;
+                valColor = badgeCol;
+            }
+
+            let isCustomDiff = isMod && realM?.customProps.has(p) && state.currentMode === 'custom';
+            let bClass = diff && !isProc ? (isCustomDiff ? "subtle-diff-border-custom" : "subtle-diff-border") : "";
+            let tClass = diff && !isProc ? (isCustomDiff ? 'text-custom fw-bold' : 'text-warning fw-bold') : '';
+
+            return `<tr class="${rowHover}" ${trAttrs}><td class="${bClass}" style="width:35%; border-color:#30363d; transition: background 0.1s;"><span style="color:${propColor}; font-weight:${propWeight};">${p}</span></td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${diff && !isProc?'':valColor}; transition: background 0.1s;">${valH}</td></tr>`;
         };
 
         for(const [gName, pList] of Object.entries(dict.groups || {})) {
@@ -762,8 +951,51 @@ function showProps(o, m) {
         return h || `<div class="text-secondary p-3">Keine Properties definiert.</div>`;
     };
 
-    S('pane1').innerHTML = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Original Base</h6>` + bTbl(oP, mP, false);
-    S('pane2').innerHTML = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Modular Target</h6>` + bTbl(mP, oP, true);
+    let isOrigMissing = !o;
+    let isModMissing = !m || m.isDeleted;
+    
+    let mPropsToUse = m ? (state.currentMode === 'core' && Object.keys(m.coreProps || {}).length > 0 ? m.coreProps : m.props) : {};
+
+    let fH1 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Original Base</h6>`;
+    let fH2 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">Modular Target ${state.currentMode === 'core' && hasMods ? '(Core)' : ''}</h6>`;
+
+    if (isOrigMissing && !isModMissing) {
+        fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Element existiert im Original nicht (Neu in Modular).</div>`;
+        fH2 += buildTable(mPropsToUse, mPropsToUse, true, o, m, act.type);
+    } else if (!isOrigMissing && isModMissing) {
+        fH1 += buildTable(o.props, o.props, false, o, m, act.type);
+        fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Element existiert in Modular nicht mehr (Gelöscht).</div>`;
+    } else {
+        fH1 += buildTable(o.props, mPropsToUse, false, o, m, act.type);
+        fH2 += buildTable(mPropsToUse, o.props, true, o, m, act.type);
+    }
+
+    if (act.type === 'entity') {
+        let cO = state.origData.context, cM = state.modData.context;
+        let cMProps = cM ? (state.currentMode === 'core' && Object.keys(cM.coreProps || {}).length > 0 ? cM.coreProps : cM.props) : {};
+
+        if (cO || cM) {
+            fH1 += `<div class="mt-4"><h6 style="color:#f78166; text-transform:uppercase; font-size:11px; margin-bottom:10px;"><i class="fa-solid fa-sitemap"></i> Context Info</h6>`;
+            fH2 += `<div class="mt-4"><h6 style="color:#f78166; text-transform:uppercase; font-size:11px; margin-bottom:10px;"><i class="fa-solid fa-sitemap"></i> Context Info</h6>`;
+            
+            let isCtxOrigMissing = !cO;
+            let isCtxModMissing = !cM || cM.isDeleted;
+
+            if (isCtxOrigMissing && !isCtxModMissing) {
+                fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Kontext existiert im Original nicht (Neu).</div></div>`;
+                fH2 += buildTable(cMProps, cMProps, true, cO, cM, 'neonContext') + `</div>`;
+            } else if (!isCtxOrigMissing && isCtxModMissing) {
+                fH1 += buildTable(cO.props, cO.props, false, cO, cM, 'neonContext') + `</div>`;
+                fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Kontext existiert in Modular nicht mehr.</div></div>`;
+            } else {
+                fH1 += buildTable(cO.props, cMProps, false, cO, cM, 'neonContext') + `</div>`;
+                fH2 += buildTable(cMProps, cO.props, true, cO, cM, 'neonContext') + `</div>`;
+            }
+        }
+    }
+
+    S('pane1').innerHTML = fH1;
+    S('pane2').innerHTML = fH2;
 }
 
 const p1 = S('pane1'), p2 = S('pane2'); let isSyncP1 = false, isSyncP2 = false;
@@ -796,7 +1028,8 @@ function generateTplTable(tpl, compTpl, isMod, actIsCustom) {
 
 function renderViews(o, m) {
     state.currentViewXml = { 1: o?.rawXml?.outerHTML || "", 2: m?.rawXml?.outerHTML || "" };
-    let act = m || o; let refs = new Set([ ...(projOrig?.viewRefs[act.name] || []), ...(projMod?.viewRefs[act.name] || []) ]);
+    let act = m || o; 
+    let refs = new Set([...getRefsCI(projOrig?.viewRefs, act.name), ...getRefsCI(projMod?.viewRefs, act.name)]);
     
     let refStr = `<div class="prop-box mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">`;
     if(refs.size > 0) { refStr += [...refs].sort().map(c => `<span class="badge ${c.startsWith('Context:') ? 'bg-primary' : 'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''); } 
@@ -804,14 +1037,14 @@ function renderViews(o, m) {
     refStr += `</div></div>`;
 
     let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
-    let allTplNames = new Set([...Object.keys(oTpls), ...Object.keys(mTpls)]);
 
     const buildSide = (tpls, compTpls, side, isMod, actIsCustom) => {
+        let localTplNames = getUniqueStringCI(Object.keys(tpls), Object.keys(compTpls));
         let h = `<div class="list-group list-group-flush rounded-1 border" style="border-color: #30363d !important;">`;
-        if(allTplNames.size === 0) return h + `<div class="p-3 text-muted small">Keine Templates</div></div>`;
+        if(localTplNames.length === 0) return h + `<div class="p-3 text-muted small">Keine Templates</div></div>`;
         
-        [...allTplNames].sort().forEach(tName => {
-            let tpl = tpls[tName]; let compTpl = compTpls[tName];
+        localTplNames.sort().forEach(tName => {
+            let tpl = getTplCI(tpls, tName); let compTpl = getTplCI(compTpls, tName);
             let hash = Math.random().toString(36).substr(2, 9); let collapseId = 'tpl_' + side + '_' + hash; let chevronId = 'chev_' + side + '_' + hash;
 
             if(!tpl) { h += `<div class="list-group-item p-2" style="background:#161b22; border-color:#30363d; opacity:0.5;"><div class="text-danger fw-bold"><i class="fa-solid fa-minus"></i> Fehlt (in dieser Version)</div></div>`; return; }
@@ -832,54 +1065,132 @@ function renderViews(o, m) {
     };
 
     let ctrlBar = `<div class="mb-2"><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
-    S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Original Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + buildSide(oTpls, mTpls, 1, false, false);
-    S('pane2').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Modular Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + buildSide(mTpls, oTpls, 2, true, act.isCustom);
+    
+    let isOrigMissing = !o;
+    let isModMissing = !m || m.isDeleted;
+
+    let origContent = "";
+    let modContent = "";
+
+    if (isOrigMissing && !isModMissing) {
+        origContent = `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> View existiert im Original nicht (Neu).</div>`;
+        modContent = buildSide(mTpls, mTpls, 2, true, act.isCustom);
+    } else if (!isOrigMissing && isModMissing) {
+        origContent = buildSide(oTpls, oTpls, 1, false, false);
+        modContent = `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> View existiert in Modular nicht mehr (Gelöscht).</div>`;
+    } else {
+        origContent = buildSide(oTpls, mTpls, 1, false, false);
+        modContent = buildSide(mTpls, oTpls, 2, true, act.isCustom);
+    }
+
+    S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Original Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + origContent;
+    S('pane2').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">Modular Templates & Refs</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + modContent;
 }
 
 // --- DIFF VIEW ---
 function toggleDebugBanner() { S('debug-banner').classList.toggle('d-none'); }
 function copyPath(side) { let p = S('debug-path-'+side).textContent; if(p && p!=='...') navigator.clipboard.writeText(p); }
 
-async function loadDiff(pName, pOrig, pMod, isCustomMod, targetNode, origNode) {
-    S('props-view').classList.add('d-none'); S('diff-view-container').classList.remove('d-none'); S('diff-toolbar').classList.remove('d-none'); S('diff-toolbar').classList.add('d-flex');
+async function loadDiff(pName, pOrig, pMod, targetNode, origNode) {
+    S('props-view').classList.add('d-none'); 
+    S('diff-view-container').classList.remove('d-none'); 
+    S('diff-view-container').classList.add('d-flex'); 
+    S('diff-toolbar').classList.remove('d-none'); 
+    S('diff-toolbar').classList.add('d-flex');
+    
     S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pName}`;
     S('diff-html-target').innerHTML = '<div class="p-5 text-center" style="color:#58a6ff"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i><br>Lade Code...</div>';
 
     let cOrig = origNode?.procContents[pName] || ""; let cMod = targetNode?.procContents[pName] || ""; let cSource = targetNode?.coreProcContents[pName] || cMod; 
     S('debug-path-orig').textContent = pOrig || "Nicht vorhanden";
+    
+    let isCustomMod = targetNode?.customProcs.has(pName) || false;
     state.diffViewInfo = { origCode: cOrig, modCode: cMod, sourceCode: cSource, name: pName, pOrig: pOrig, pMod: pMod, isCustomMod: isCustomMod, targetNode: targetNode };
     
-    if(isCustomMod && targetNode && targetNode.coreProcContents[pName]) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
-    setDiffMode(isCustomMod ? 'custom' : 'core');
+    if(isCustomMod) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
+    setMode(isCustomMod ? 'custom' : 'core');
 }
 
 async function reloadCurrentProcess() {
     if(state.diffViewInfo) {
-        let { name, pOrig, pMod, isCustomMod, targetNode } = state.diffViewInfo;
+        let { name, pOrig, pMod, targetNode } = state.diffViewInfo;
         if(pOrig) { let f = projOrig.findFile(pOrig); if(f) state.diffViewInfo.origCode = await projOrig.readText(f.fullPath); }
         if(pMod) { let f = projMod.findFile(pMod); if(f) { state.diffViewInfo.modCode = await projMod.readText(f.fullPath); targetNode.procContents[name] = state.diffViewInfo.modCode; } }
-        let mode = S('btn-mode-custom').classList.contains('btn-custom') ? 'custom' : 'core'; setDiffMode(mode);
+        setDiffMode(state.currentMode);
     }
 }
 
 async function setDiffMode(mode) {
     if(!state.diffViewInfo) return;
-    if(state.diffViewInfo.isCustomMod) { S('btn-mode-core').className = mode === 'core' ? 'btn btn-secondary' : 'btn btn-outline-secondary'; S('btn-mode-custom').className = mode === 'custom' ? 'btn btn-custom' : 'btn btn-outline-custom'; }
 
     let c1 = state.diffViewInfo.origCode; let c2 = mode === 'custom' ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode;
     let activeModPath = mode === 'custom' ? state.diffViewInfo.pMod : (state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name] || state.diffViewInfo.pMod);
     S('debug-path-mod').textContent = activeModPath || "Nicht vorhanden";
 
-    try { if(c1) c1 = await prettier.format(c1, { parser: "babel", plugins: prettierPlugins }); if(c2) c2 = await prettier.format(c2, { parser: "babel", plugins: prettierPlugins }); } catch(e){}
+    let isRawMode = S('rawDiffToggle') && S('rawDiffToggle').checked;
 
-    if (normalizeStr(c1) === normalizeStr(c2) && c1 !== "") {
-        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-check-circle"></i> <strong>Code ist identisch.</strong></div><div class="p-3 bg-dark"><pre><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
+    if (!c1 && c2) {
+        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> <strong>Neu in Modular.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c2)}</code></pre></div>`;
+        hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
+    } else if (c1 && !c2) {
+        S('diff-html-target').innerHTML = `<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> <strong>Entfernt in Modular.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
         hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
     }
-    const ds = Diff.createTwoFilesPatch("Original", mode==="custom" ? "Modular Target (Custom)" : "Modular Target (Core)", c1, c2, "", "", { context: 99999 });
-    S('diff-html-target').innerHTML = '';
-    const ui = new Diff2HtmlUI(S('diff-html-target'), ds, { drawFileList: false, matching: 'words', outputFormat: 'side-by-side', colorScheme: 'dark' }, hljs);
-    ui.draw(); ui.highlightCode();
+
+    if (normalizeStr(c1) === normalizeStr(c2) && c1 !== "") {
+        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-check-circle"></i> <strong>Code ist identisch.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
+        hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
+    }
+    
+    if (isRawMode) {
+        // Hilfsfunktion zum Generieren einer Seite inklusive Zeilennummern
+        const buildRawPane = (title, code, isLeft) => {
+            let linesCount = (code || "").split('\n').length;
+            let lineNums = '';
+            for(let i=1; i<=linesCount; i++) lineNums += i + '\n';
+            let borderClass = isLeft ? 'border-end border-secondary' : '';
+            
+            return `
+            <div class="d-flex flex-column ${borderClass}" style="flex: 1 1 50%; min-width: 0;">
+                <div class="bg-dark p-2 text-secondary fw-bold border-bottom border-secondary" style="font-size:11px;">${title}</div>
+                <div class="bg-dark flex-grow-1 overflow-auto raw-diff-pane d-flex align-items-start" style="min-height:0; position:relative;">
+                    <div class="text-secondary user-select-none text-end border-end border-secondary" style="padding: 1rem 0.5rem; min-width: 45px; font-size: 14px; font-family: var(--bs-font-monospace); line-height: 1.5; background: #0d1117; position: sticky; left: 0; z-index: 5; white-space: pre; opacity: 0.6;">${lineNums}</div>
+                    <div style="padding: 1rem; width: max-content; min-width: calc(100% - 45px);">
+                        <pre class="m-0" style="font-size: 14px; line-height: 1.5;"><code class="language-javascript" style="background: transparent; padding: 0;">${escapeHtml(code)}</code></pre>
+                    </div>
+                </div>
+            </div>`;
+        };
+
+        S('diff-html-target').innerHTML = `
+            <div class="d-flex flex-row flex-grow-1 overflow-hidden w-100 h-100">
+                ${buildRawPane('Original Base', c1, true)}
+                ${buildRawPane('Modular Target ' + (mode === 'core' ? '(Core)' : '(Custom)'), c2, false)}
+            </div>
+        `;
+        hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[0]);
+        hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[1]);
+    } else {
+        const ds = Diff.createTwoFilesPatch("Original", mode==="custom" ? "Modular Target (Custom)" : "Modular Target (Core)", c1||"", c2||"", "", "", { context: 99999 });
+        S('diff-html-target').innerHTML = '';
+        const ui = new Diff2HtmlUI(S('diff-html-target'), ds, { drawFileList: false, matching: 'words', outputFormat: 'side-by-side', colorScheme: 'dark' }, hljs);
+        ui.draw(); ui.highlightCode();
+    }
+
+    setTimeout(() => {
+        const sides = document.querySelectorAll('.d2h-file-side-diff, .raw-diff-pane');
+        if (sides.length === 2) {
+            let isSyncingLeft = false, isSyncingRight = false;
+            sides[0].addEventListener('scroll', () => {
+                if (!isSyncingLeft) { isSyncingRight = true; sides[1].scrollTop = sides[0].scrollTop; }
+                isSyncingLeft = false;
+            });
+            sides[1].addEventListener('scroll', () => {
+                if (!isSyncingRight) { isSyncingLeft = true; sides[0].scrollTop = sides[1].scrollTop; }
+                isSyncingRight = false;
+            });
+        }
+    }, 50);
 }
 
 function copySource(id) { 
