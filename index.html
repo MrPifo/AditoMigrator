@@ -1,167 +1,138 @@
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="dark">
 <head>
-<meta charset="UTF-8">
-<title>ADITO Migrator v1.4</title>
-
+<meta charset="UTF-8"><title>ADITO Migrator v1.5</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html-ui.min.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-
 <style>
-    body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-    #sidebar { width: 500px; min-width: 300px; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #30363d; background: #161b22; }
-    #tree-container { flex: 1; overflow-y: auto; padding-bottom: 20px; }
-    
-    .tree-row { display: flex; align-items: center; padding: 5px 8px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 6px; transition: background 0.1s; }
-    .tree-row:hover { background: rgba(255,255,255,0.05); }
-    .tree-row.active { background: rgba(56, 139, 253, 0.15); box-shadow: inset 3px 0 0 #58a6ff; font-weight: 600; color: #ffffff !important; }
-    .tree-row.active .node-text { color: #ffffff !important; }
-    .tree-row > span.node-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; transition: color 0.1s; }
-    
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
-    .icon-col { width: 16px; text-align: center; transition: opacity 0.1s; }
-    
-    .group-header { font-weight: bold; background: rgba(0,0,0,0.3) !important; border-top: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; font-size: 11px; color: #c9d1d9; }
-    .collapsed + .tree-sub { display: none; }
-    .toggle-icon { width: 16px; text-align: center; font-size: 12px; transition: transform 0.2s; color: #6e7681; cursor: pointer; }
-    .toggle-icon:hover { color: #c9d1d9; }
-    .collapsed > .toggle-icon { transform: rotate(-90deg); }
-    .no-children > .toggle-icon { visibility: hidden; }
-    
-    #content-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; background: #0d1117; }
-    .diff-wrapper { display: flex; flex: 1; overflow: hidden; position: relative; }
-    .diff-pane { flex: 1 1 50%; overflow-y: auto; padding: 15px; min-width: 0; }
-    #resizer { width: 4px; cursor: col-resize; background: #30363d; z-index: 5; transition: background 0.2s; }
-    #resizer:hover { background: #58a6ff; }
-    
-    .subtle-diff-border { border-left: 3px solid var(--bs-warning) !important; }
-    .subtle-diff-border-custom { border-left: 3px solid #d2a8ff !important; }
-    .text-custom { color: #d2a8ff !important; }
-    .badge-custom { background-color: #8e44ad; color: white; border: 1px solid #9b59b6; }
-    .btn-custom { background-color: #8e44ad; color: white; border-color: #9b59b6; }
-    .btn-custom:hover { background-color: #9b59b6; color: white; }
-    .btn-outline-custom { color: #d2a8ff; border-color: #9b59b6; }
-    .btn-outline-custom:hover { background-color: #8e44ad; color: white; }
-
-    /* Template Mode Colors */
-    #tplToggle:checked { background-color: #f85149; border-color: #f85149; }
-    #tplToggle { background-color: var(--bs-dark); border-color: #f85149; }
-    .subtle-diff-border-template { border-left: 3px solid #f85149 !important; }
-    .text-template { color: #f85149 !important; }
-    body.template-mode .bg-warning { background-color: #f85149 !important; }
-    body.template-mode .text-warning { color: #f85149 !important; }
-    body.template-mode .border-warning { border-color: #f85149 !important; }
-    body.template-mode .legend-proc { border-color: #f85149 !important; }
-    
-    .prop-row { transition: background 0.1s; }
-    .prop-row:hover { background: rgba(255,255,255,0.03); }
-    .prop-row-interactive:hover { background: rgba(88, 166, 255, 0.1); cursor: pointer; }
-    
-    .view-tpl-header { cursor: pointer; transition: background 0.1s; }
-    .view-tpl-header:hover { background: #21262d !important; }
-    .tpl-chevron { transition: transform 0.2s; font-size: 11px; }
-    .tpl-chevron.collapsed { transform: rotate(-90deg); }
-    
-    .prop-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; margin-bottom: 15px; }
-    .prop-box-header { background: rgba(0,0,0,0.2); border-bottom: 1px solid #30363d; padding: 6px 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #c9d1d9; }
-
-    ::-webkit-scrollbar { width: 12px; height: 12px; }
-    ::-webkit-scrollbar-track { background: #0d1117; border-left: 1px solid #30363d; border-top: 1px solid #30363d; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 6px; border: 2px solid #0d1117; }
-    ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
-    ::-webkit-scrollbar-corner { background: #0d1117; }
-
-    #diff-view-container { flex: 1; min-height: 0; overflow: hidden; }
-    #diff-view-container.d-flex { display: flex !important; }
-    #diff-html-target { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-    
-    .d2h-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin: 0; }
-    .d2h-file-wrapper { flex: 1 !important; display: flex !important; flex-direction: column; min-height: 0; overflow: hidden; margin: 0 !important; border: none !important; border-radius: 0 !important; }
-    .d2h-files-diff { flex: 1; display: flex; min-height: 0; overflow: hidden; }
-    
-    .d2h-file-side-diff { flex: 1 1 50%; overflow: auto !important; min-height: 0; position: relative; }
-    .d2h-code-wrapper { overflow: visible !important; width: max-content !important; min-width: 100%; height: auto !important; }
-    
-    .d2h-file-header, .d2h-file-list-wrapper, .d2h-file-name-wrapper, .d2h-icon, .d2h-tag { display: none !important; }
+body{height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px;background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;transition:box-shadow .3s}
+#sidebar{width:500px;min-width:300px;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid #30363d;background:#161b22}
+#tree-container{flex:1;overflow-y:auto;padding-bottom:20px}
+.tree-row{display:flex;align-items:center;padding:5px 8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);gap:6px;transition:background .1s}
+.tree-row:hover{background:rgba(255,255,255,.05)}
+.tree-row.active{background:rgba(56,139,253,.15);box-shadow:inset 3px 0 0 #58a6ff;font-weight:600;color:#fff!important}
+.tree-row.active .node-text{color:#fff!important}
+.tree-row>span.node-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;transition:color .1s}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;box-sizing:border-box}
+.icon-col{width:16px;text-align:center;transition:opacity .1s}
+.group-header{font-weight:700;background:rgba(0,0,0,.3)!important;border-top:1px solid rgba(255,255,255,.05);text-transform:uppercase;font-size:11px;color:#c9d1d9}
+.collapsed+.tree-sub{display:none}
+.toggle-icon{width:16px;text-align:center;font-size:12px;transition:transform .2s;color:#6e7681;cursor:pointer}
+.toggle-icon:hover{color:#c9d1d9}
+.collapsed>.toggle-icon{transform:rotate(-90deg)}
+.no-children>.toggle-icon{visibility:hidden}
+#content-view{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;background:#0d1117}
+.diff-wrapper{display:flex;flex:1;overflow:hidden;position:relative}
+.diff-pane{flex:1 1 50%;overflow-y:auto;padding:15px;min-width:0}
+#resizer{width:4px;cursor:col-resize;background:#30363d;z-index:5;transition:background .2s}
+#resizer:hover{background:#58a6ff}
+.subtle-diff-border{border-left:3px solid var(--bs-warning)!important}
+.subtle-diff-border-custom{border-left:3px solid #d2a8ff!important}
+.text-custom{color:#d2a8ff!important}
+.badge-custom{background-color:#8e44ad;color:#fff;border:1px solid #9b59b6}
+.btn-custom{background-color:#8e44ad;color:#fff;border-color:#9b59b6}
+.btn-custom:hover{background-color:#9b59b6;color:#fff}
+.btn-outline-custom{color:#d2a8ff;border-color:#9b59b6}
+.btn-outline-custom:hover{background-color:#8e44ad;color:#fff}
+#tplToggle:checked{background-color:#f85149;border-color:#f85149}
+#tplToggle{background-color:var(--bs-dark);border-color:#f85149}
+body.template-mode{box-shadow:inset 0 8px 0 #f85149}
+body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0%,#161b22 60%)!important;box-shadow:inset 0 -3px 0 #f85149!important}
+.prop-row{transition:background .1s}
+.prop-row:hover{background:rgba(255,255,255,.03)}
+.prop-row-interactive:hover{background:rgba(88,166,255,.1);cursor:pointer}
+.view-tpl-header{cursor:pointer;transition:background .1s}
+.view-tpl-header:hover{background:#21262d!important}
+.tpl-chevron{transition:transform .2s;font-size:11px}
+.tpl-chevron.collapsed{transform:rotate(-90deg)}
+.prop-box{background:#161b22;border:1px solid #30363d;border-radius:6px;overflow:hidden;margin-bottom:15px}
+.prop-box-header{background:rgba(0,0,0,.2);border-bottom:1px solid #30363d;padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase;color:#c9d1d9}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:#0d1117;border-left:1px solid #30363d;border-top:1px solid #30363d}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid #0d1117}
+::-webkit-scrollbar-thumb:hover{background:#58a6ff}
+::-webkit-scrollbar-corner{background:#0d1117}
+#diff-view-container,#diff-html-target{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+#diff-view-container.d-flex{display:flex!important}
+.d2h-wrapper{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;margin:0}
+.d2h-file-wrapper{flex:1!important;display:flex!important;flex-direction:column;min-height:0;overflow:hidden;margin:0!important;border:none!important;border-radius:0!important}
+.d2h-files-diff{flex:1;display:flex;min-height:0;overflow:hidden}
+.d2h-file-side-diff{flex:1 1 50%;overflow:auto!important;min-height:0;position:relative}
+.d2h-code-wrapper{overflow:visible!important;width:max-content!important;min-width:100%;height:auto!important}
+.d2h-file-header,.d2h-file-list-wrapper,.d2h-file-name-wrapper,.d2h-icon,.d2h-tag{display:none!important}
 </style>
 </head>
 <body>
 
-<header class="d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background: #161b22; border-color: #30363d !important;">
-    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.4</div>
-    <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
-    <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light" onclick="document.getElementById('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
-    <button id="btn-f3" class="btn btn-sm btn-outline-secondary text-light ms-1" onclick="document.getElementById('f3').click()"><i class="fa-regular fa-folder"></i> 3. Template (Opt.)</button>
-   
+<header class="main-header d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background:#161b22; border-color:#30363d!important; transition:background .3s, box-shadow .3s;">
+    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.5</div>
+    <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
+    <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
+    <button id="btn-f3" class="btn btn-sm btn-outline-secondary text-light ms-1 text-truncate" style="max-width:250px;" onclick="S('f3').click()"><i class="fa-regular fa-folder"></i> 3. Template</button>
     <div class="d-flex align-items-center ms-3">
-        <select id="entitySelect" class="form-select form-select-sm w-auto bg-dark text-light" disabled>
-            <option value="">Warte auf Projekte...</option>
-        </select>
+        <select id="entitySelect" class="form-select form-select-sm w-auto bg-dark text-light" disabled><option value="">Warte auf Projekte...</option></select>
         <button class="btn btn-sm btn-primary ms-2" onclick="startAnalysis()" id="btn-analyze" disabled title="Entity analysieren"><i class="fa-solid fa-play"></i></button>
         <button class="btn btn-sm btn-outline-info ms-1 d-none" onclick="reloadEntity()" id="btn-reload" title="Kompletten Reload erzwingen"><i class="fa-solid fa-rotate"></i></button>
-        
-        <div class="form-check form-switch ms-4 mb-0 d-none" id="tpl-toggle-container">
-            <input class="form-check-input shadow-sm" type="checkbox" id="tplToggle" onchange="toggleMode()" style="cursor: pointer;">
-            <label class="form-check-label text-danger fw-bold" for="tplToggle" style="font-size: 13px; cursor: pointer;">Template vs Source</label>
+        <div class="form-check form-switch ms-4 mb-0 d-none d-flex align-items-center" id="tpl-toggle-container">
+            <input class="form-check-input shadow-sm mt-0 me-2" type="checkbox" id="tplToggle" onchange="toggleMode()" style="width:3em; height:1.5em; cursor:pointer;">
+            <label class="form-check-label text-danger fw-bold" for="tplToggle" style="font-size:14px; cursor:pointer; padding-top:2px;">Template vs Source</label>
         </div>
     </div>
-
     <div class="ms-auto d-flex gap-3 text-secondary small align-items-center">
         <span title="Eigene Projekt-Anpassung"><span class="badge badge-custom shadow-sm"><i class="fa-solid fa-wrench"></i> CUSTOM</span></span>
-        <span title="Enthält Modifikationen"><i class="fa-solid fa-wrench" style="color: #d2a8ff; opacity: 0.8;"></i> Modifiziert</span>
+        <span title="Enthält Modifikationen"><i class="fa-solid fa-wrench" style="color:#d2a8ff; opacity:0.8;"></i> Modifiziert</span>
         <span class="border-start border-secondary h-50 mx-1"></span>
-        <span><div class="status-dot d-inline-block" style="background:#8b949e;"></div> Modular/Source-Only</span>
         <span><div class="status-dot d-inline-block" style="border:1px solid #30363d; background:transparent;"></div> Gleich</span>
+        <span><div class="status-dot d-inline-block" style="background-color:#3fb950!important;"></div> Neu</span>
         <span><div class="status-dot bg-danger d-inline-block"></div> Fehlt</span>
         <span><div class="status-dot bg-warning d-inline-block"></div> Geändert</span>
-        <span><div class="status-dot d-inline-block legend-proc" style="border: 2px solid #d29922; background:transparent;"></div> Prozess-Diff</span>
+        <span><div class="status-dot d-inline-block legend-proc" style="border:2px solid #d29922; background:transparent;"></div> Prozess-Diff</span>
     </div>
-
-    <input type="file" id="f1" nwdirectory hidden>
-    <input type="file" id="f2" nwdirectory hidden>
-    <input type="file" id="f3" nwdirectory hidden>
+    <input type="file" id="f1" nwdirectory hidden><input type="file" id="f2" nwdirectory hidden><input type="file" id="f3" nwdirectory hidden>
 </header>
 
 <main class="d-flex flex-grow-1 overflow-hidden">
     <div id="sidebar">
-        <div class="p-2 border-bottom d-flex flex-column gap-2" style="background: #161b22; border-color: #30363d !important;">
+        <div class="p-2 border-bottom d-flex flex-column gap-2" style="background:#161b22; border-color:#30363d!important;">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <button class="btn btn-sm btn-outline-secondary border-0" onclick="toggleAllTree(false)" title="Einklappen"><i class="fa-solid fa-compress"></i></button>
-                    <button class="btn btn-sm btn-outline-secondary border-0" onclick="toggleAllTree(true)" title="Ausklappen"><i class="fa-solid fa-expand"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary border-0" onclick="toggleAllTree(false)"><i class="fa-solid fa-compress"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary border-0" onclick="toggleAllTree(true)"><i class="fa-solid fa-expand"></i></button>
                 </div>
                 <span class="small text-secondary" id="file-status">Keine Projekte.</span>
             </div>
-            <div class="form-check form-switch mb-0 align-self-start ms-1">
-                <input class="form-check-input" type="checkbox" id="ignoreTitleToggle" onchange="renderTreeStateful()">
-                <label class="form-check-label text-secondary" style="font-size: 11px;" for="ignoreTitleToggle">Ignore 'title' diffs</label>
+            <div class="form-check form-switch mb-0 mt-2 ms-1 d-flex align-items-center">
+                <input class="form-check-input mt-0 me-2" type="checkbox" id="ignoreTitleToggle" onchange="renderTreeStateful()" style="width:3em; height:1.5em; cursor:pointer;">
+                <label class="form-check-label text-secondary fw-bold" style="font-size:14px; cursor:pointer; padding-top:2px;" for="ignoreTitleToggle">Ignore 'title' diffs</label>
+            </div>
+            <div class="mt-2 position-relative">
+                <i class="fa-solid fa-search position-absolute text-secondary" style="top:8px; left:10px; font-size:12px;"></i>
+                <input type="text" id="treeSearch" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="Filter..." oninput="filterTree(this.value)" style="padding-left:30px;">
             </div>
         </div>
         <div id="tree-container"></div>
     </div>
     
     <div id="content-view">
-        <div class="p-2 border-bottom d-flex align-items-center justify-content-between" style="background: #161b22; border-color: #30363d !important;">
-            <div id="view-title" class="fw-bold" style="color: #c9d1d9;">Bitte ein Element auswählen</div>
-            
+        <div class="p-2 border-bottom d-flex align-items-center justify-content-between" style="background:#161b22; border-color:#30363d!important;">
+            <div id="view-title" class="fw-bold" style="color:#c9d1d9;">Bitte ein Element auswählen</div>
             <div class="d-flex align-items-center gap-2">
                 <div class="btn-group btn-group-sm shadow-sm me-3 d-none" id="mode-toggle">
                     <button class="btn btn-secondary fw-bold" id="btn-mode-core" onclick="setMode('core')">Modul Core</button>
                     <button class="btn btn-outline-secondary" id="btn-mode-custom" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
                 </div>
-                
                 <div id="diff-toolbar" class="d-none align-items-center gap-2 border-start border-secondary ps-3 ms-1">
                     <div class="form-check form-switch me-3 mb-0 text-light d-flex align-items-center">
-                        <input class="form-check-input mt-0 me-2" type="checkbox" id="rawDiffToggle" onchange="setDiffMode(state.currentMode)" style="width: 3em; height: 1.5em; cursor: pointer;">
-                        <label class="form-check-label fw-bold" for="rawDiffToggle" title="Schaltet die detaillierte Diff-Markierung aus und zeigt die Prozesse roh nebeneinander" style="font-size: 14px; cursor: pointer; padding-top: 2px;">Raw Mode</label>
+                        <input class="form-check-input mt-0 me-2" type="checkbox" id="rawDiffToggle" onchange="setDiffMode(state.currentMode)" style="width:3em; height:1.5em; cursor:pointer;">
+                        <label class="form-check-label fw-bold" for="rawDiffToggle" style="font-size:14px; cursor:pointer; padding-top:2px;">Raw Mode</label>
                     </div>
-                    <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()" title="Source Pfade ein/ausblenden"><i class="fa-solid fa-bug"></i> Debug</button>
-                    <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()" title="Prozess neu laden"><i class="fa-solid fa-rotate"></i></button>
+                    <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()"><i class="fa-solid fa-bug"></i> Debug</button>
+                    <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()"><i class="fa-solid fa-rotate"></i></button>
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Links</button>
                         <button class="btn btn-outline-secondary" id="copy-btn-2" onclick="copySource(2)"><i class="fa-regular fa-copy"></i> Rechts</button>
@@ -170,1226 +141,386 @@
             </div>
         </div>
         
-        <div id="debug-banner" class="d-none bg-dark p-2" style="font-size: 11px; border-bottom: 1px solid #b8860b; box-shadow: inset 0 -2px 5px rgba(0,0,0,0.3);">
+        <div id="debug-banner" class="d-none bg-dark p-2" style="font-size:11px; border-bottom:1px solid #b8860b; box-shadow:inset 0 -2px 5px rgba(0,0,0,.3);">
             <div class="row m-0 w-100">
                 <div class="col-6 d-flex align-items-center border-end border-secondary">
-                    <span class="text-secondary fw-bold me-2">BASE:</span>
-                    <span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-orig">...</span>
-                    <button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size: 10px;" onclick="copyPath('orig')"><i class="fa-solid fa-copy"></i></button>
+                    <span class="text-secondary fw-bold me-2">BASE:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-orig">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyPath('orig')"><i class="fa-solid fa-copy"></i></button>
                 </div>
                 <div class="col-6 d-flex align-items-center">
-                    <span class="text-secondary fw-bold me-2">TARGET:</span>
-                    <span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-mod">...</span>
-                    <button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size: 10px;" onclick="copyPath('mod')"><i class="fa-solid fa-copy"></i></button>
+                    <span class="text-secondary fw-bold me-2">TARGET:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-mod">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyPath('mod')"><i class="fa-solid fa-copy"></i></button>
                 </div>
             </div>
         </div>
 
-        <div class="diff-wrapper" id="props-view">
-            <div class="diff-pane" id="pane1"></div>
-            <div id="resizer"></div>
-            <div class="diff-pane" id="pane2"></div>
-        </div>
-
-        <div id="diff-view-container" class="d-none flex-column">
-            <div id="diff-html-target" class="bg-dark"></div>
-        </div>
+        <div class="diff-wrapper" id="props-view"><div class="diff-pane" id="pane1"></div><div id="resizer"></div><div class="diff-pane" id="pane2"></div></div>
+        <div id="diff-view-container" class="d-none"><div id="diff-html-target" class="bg-dark"></div></div>
     </div>
 </main>
 
 <script>
-// --- NW.JS APIS & HELPERS ---
-const fs = typeof require !== 'undefined' ? require('fs') : null;
-const path = typeof require !== 'undefined' ? require('path') : null;
-const S = (id) => document.getElementById(id);
-const escapeHtml = (unsafe) => unsafe ? unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
+const fs=typeof require!=='undefined'?require('fs'):null, path=typeof require!=='undefined'?require('path'):null;
+const S=i=>document.getElementById(i), esc=u=>u?u.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):"";
+window.projNameOrig=window.projNameMod=window.projNameTpl="";
 
-// Case-Insensitive Helpers
-function getUniqueNamesCI(arr1, arr2) {
-    let map = new Map();
-    (arr1 || []).forEach(x => { if(x && x.name) map.set(x.name.toLowerCase(), x.name); });
-    (arr2 || []).forEach(x => { if(x && x.name) map.set(x.name.toLowerCase(), x.name); });
-    return Array.from(map.values());
-}
-function findCaseInsensitive(arr, name) {
-    if(!arr || !name) return undefined;
-    const lower = name.toLowerCase();
-    return arr.find(x => x && x.name && x.name.toLowerCase() === lower);
-}
-function getUniqueStringCI(arr1, arr2) {
-    let map = new Map();
-    (arr1 || []).forEach(x => map.set(x.toLowerCase(), x));
-    (arr2 || []).forEach(x => map.set(x.toLowerCase(), x));
-    return Array.from(map.values());
-}
-function getTplCI(tplMap, name) {
-    if (!tplMap || !name) return undefined;
-    let key = Object.keys(tplMap).find(k => k.toLowerCase() === name.toLowerCase());
-    return key ? tplMap[key] : undefined;
-}
-function getRefsCI(refsObj, name) {
-    let res = new Set();
-    if(!refsObj || !name) return res;
-    let lower = name.toLowerCase();
-    Object.keys(refsObj).forEach(k => {
-        if(k.toLowerCase() === lower) refsObj[k].forEach(v => res.add(v));
-    });
-    return res;
-}
+const getUniq= (a,b)=>[...new Map([...(a||[]),...(b||[])].filter(x=>x&&x.name).map(x=>[x.name.toLowerCase(),x.name])).values()];
+const findCI=(a,n)=>n&&a?a.find(x=>x&&x.name&&x.name.toLowerCase()===n.toLowerCase()):undefined;
+const getTplCI=(m,n)=>n?m[Object.keys(m).find(k=>k.toLowerCase()===n.toLowerCase())]:undefined;
+const getRefsCI=(m,n)=>new Set(n?Object.keys(m).filter(k=>k.toLowerCase()===n.toLowerCase()).flatMap(k=>[...m[k]]):[]);
 
-// --- METADATA DICTIONARY ---
-const ADITO_PROCESS_NAMES_ARR = ["titleProcess", "linkedContextProcess", "tooltipProcess", "placeholderProcess", "valueProcess", "displayProcess", "displayValueProcess", "onValidation", "onValueChange", "dropDownProcess", "colorProcess", "stateProcess", "mandatoryProcess", "selectionModeProcess", "contentTypeProcess", "expression", "iconProcess", "onInit", "afterUIiInit", "beforeOperatingState", "afterOperatingState", "afterSave", "initFilterProcess", "contentTitleProcess", "contentDescriptionProcess", "grantCreateProcess", "grantUpdateProcess", "grantDeleteProcess", "imageProcess", "iconIdProcess", "uniqueProviderKeyProcess", "targetConsumerProcess", "filterVariablesProcess", "onActionProcess", "process", "filterConditionProcess", "fromClauseProcess", "conditionProcess", "orderClauseProcess", "onDBInsert", "onDBUpdate", "onDBDelete", "filterFieldsProcess", "filterValuesProcess", "recordContainerProcess", "contentProcess", "groupQueryProcess", "patternExtensionProcess", "boostPatternProcess", "defaultAction", "rowCountProcess", "onInsert", "onUpdate", "onDelete", "cacheKeyProcess", "titlePluralProcess", "externalInitFilterProcess"];
-const ADITO_PROCESS_NAMES = new Set(ADITO_PROCESS_NAMES_ARR);
-const XML_WRAPPERS = new Set(["entityFields", "recordContainers", "recordFieldMappings", "implementations", "children", "filterExtensions"]);
-const IGNORE_AS_PROPS = new Set([...XML_WRAPPERS, "modelValueWrapper", "stringValueWrapper"]);
+const ADITO_PROCESS_NAMES_ARR=["titleProcess","linkedContextProcess","tooltipProcess","placeholderProcess","valueProcess","displayProcess","displayValueProcess","onValidation","onValueChange","dropDownProcess","colorProcess","stateProcess","mandatoryProcess","selectionModeProcess","contentTypeProcess","expression","iconProcess","onInit","afterUIiInit","beforeOperatingState","afterOperatingState","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess","grantCreateProcess","grantUpdateProcess","grantDeleteProcess","imageProcess","iconIdProcess","uniqueProviderKeyProcess","targetConsumerProcess","filterVariablesProcess","onActionProcess","process","filterConditionProcess","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete","filterFieldsProcess","filterValuesProcess","recordContainerProcess","contentProcess","groupQueryProcess","patternExtensionProcess","boostPatternProcess","defaultAction","rowCountProcess","onInsert","onUpdate","onDelete","cacheKeyProcess","titlePluralProcess","externalInitFilterProcess"];
+const ADITO_PROCESS_NAMES=new Set(ADITO_PROCESS_NAMES_ARR);
+const XML_WRAPPERS=new Set(["entityFields","recordContainers","recordFieldMappings","implementations","children","filterExtensions"]);
+const IGNORE_AS_PROPS=new Set([...XML_WRAPPERS,"modelValueWrapper","stringValueWrapper"]);
 
-const PROP_DICTIONARY = {
-    entity: { groups: { "General": ["title", "titlePlural", "descriptionField", "documentation", "comment", "metadata", "useFavorites", "recordRecipeSupported"], "Source": ["recordContainer"], "Processes": ["onInit", "afterUIiInit", "beforeOperatingState", "afterOperatingState", "onValidation", "afterSave", "initFilterProcess", "contentTitleProcess", "contentDescriptionProcess"], "Processes grants": ["usePermissions", "grantCreate", "grantCreateProcess", "grantUpdate", "grantUpdateProcess", "grantDelete", "grantDeleteProcess"], "Color": ["color", "colorProcess"], "Icon": ["icon", "iconProcess", "image", "imageProcess", "iconId", "iconIdProcess"] }, defaults: { useFavorites: "false", recordRecipeSupported: "false", usePermissions: "false", grantCreate: "true", grantUpdate: "true", grantDelete: "true" } },
-    entityField: { groups: { "General": ["name", "title", "titleProcess", "descriptionField", "documentation"], "Database": ["linkedContext", "linkedContextProcess", "consumer"], "Tool tip": ["tooltip", "tooltipProcess"], "Placeholder": ["placeholder", "placeholderProcess"], "Processes": ["valueProcess", "displayValueProcess", "onValidation", "onValueChange", "onValueChangeTypes", "compareChangesWithRecordField"], "Value List": ["dropDownProcess", "textInputAllowed"], "Processing grants": ["usePermissions"], "Color": ["color", "colorProcess"], "Activity": ["state", "stateProcess"], "Required field": ["mandatory", "mandatoryProcess"], "Single selection": ["selectionMode", "selectionModeProcess"], "Search": ["groupable", "preferredGroupOrder"], "Content Type": ["contentType", "contentTypeProcess"], "Formatting": ["maxFieldSize", "resolution", "outputFormat", "inputFormat"] }, defaults: { state: "AUTO", mandatory: "false", selectionMode: "SINGLE", contentType: "TEXT", textInputAllowed: "false", usePermissions: "false", groupable: "false" } },
-    entityActionField: { groups: { "General": ["name", "title", "titleProcess", "description", "documentation"], "Tool tip": ["tooltip", "tooltipProcess"], "Processing grants": ["usePermissions"], "Activity": ["state", "stateProcess"], "Icon": ["iconId", "iconIdProcess"], "Action": ["onActionProcess", "shortcut", "isMenuAction", "isObjectAction", "selectionType", "isSaveAction"] }, defaults: { state: "EDITABLE", isMenuAction: "true", isObjectAction: "true", selectionType: "UNBOUND", usePermissions: "false" } },
-    entityActionGroup: { groups: { "General": ["name", "title", "titleProcess", "description", "documentation"], "Tool tip": ["tooltip", "tooltipProcess"], "Activity": ["state", "stateProcess"], "Icon": ["iconId", "iconIdProcess"] }, defaults: {} },
-    entityProvider: { groups: { "General": ["name", "titlePlural", "titlePluralProcess", "description", "documentation", "dependencies", "lookupIdfield", "uniqueProviderKeyProcess"], "Source": ["recordcontainer", "targetContextField", "targetIdField", "targetConsumerProcess", "useAggregates", "sortingField"], "Processing grants": ["usePermissions"], "Search": ["filterVariablesProcess", "initFilterMergeMode"] }, defaults: { useAggregates: "false", usePermissions: "true", initFilterMergeMode: "AND" } },
-    entityConsumer: { groups: { "General": ["title", "description", "documentation", "entityName", "fieldName", "refreshParent", "isOneToOneRelationship"], "Processes": ["onValidation", "externalInitFilterProcess"], "Activity": ["state", "stateProcess"], "Single selection": ["selectionMode", "selectionModeProcess"] }, defaults: { state: "EDITABLE", selectionMode: "SINGLE", refreshParent: "false", isOneToOneRelationship: "false" } },
-    entityParameter: { groups: { "General": ["name", "description", "documentation", "title", "valueProcess", "expose", "mandatory"] }, defaults: { expose: "false", mandatory: "false" } },
-    dbRecordContainer: { groups: { "General": ["title", "type", "description", "documentation"], "Database": ["alias", "linkInformation", "maximumDbRows", "isPageable", "isReadOnly", "isRequireContainerFiltering", "hasDependentRecords", "fromClauseProcess", "conditionProcess", "orderClauseProcess", "onDBInsert", "onDBUpdate", "onDBDelete"] }, defaults: { type: "dbRecordContainer", isPageable: "true", isReadOnly: "false", isRequireContainerFiltering: "false", hasDependentRecords: "false" } },
-    jDitoRecordContainer: { groups: { "General": ["title", "type", "description", "documentation"], "JDito": ["jDitoRecordAlias", "recordFieldMappings", "aggregateFieldMappings", "isPageable", "supportsFilterExtensionGrouping", "isFilterable", "isGroupable", "isRequireContainerFiltering", "isSortable", "contentProcess", "rowCountProcess", "hasDependentRecords", "onInsert", "onUpdate", "onDelete"], "Cache": ["cacheType", "cacheKeyProcess"] }, defaults: { type: "jDitoRecordContainer", isPageable: "false", isFilterable: "false", isGroupable: "false", isRequireContainerFiltering: "false", isSortable: "false", hasDependentRecords: "false" } },
-    dbRecordFieldMapping: { groups: { "General": ["entityField", "type", "recordfield", "expression", "columnAlias"], "Search": ["isFilterable", "isLookupFilter", "maxFieldSize"] }, defaults: { isFilterable: "false", isLookupFilter: "false" } },
-    consumerMapping: { groups: { "General": ["type", "filterConditionProcess"], "Search": ["filtertype", "isFilterable", "isLookupFilter"] }, defaults: { isFilterable: "false", isLookupFilter: "false" } },
-    filterExtension: { groups: { "General": ["type", "documentation", "title", "isFilterable", "contentType", "useConsumer", "consumer", "filterValuesProcess", "filterConditionProcess", "groupedRecordField", "titleRecordField", "isGroupable", "groupQueryProcess"], "Search": ["filtertype", "isLookupfilter"] }, defaults: { isFilterable: "true", useConsumer: "false", isGroupable: "false", filtertype: "EXTENDED" } },
-    neonContext: { groups: { "General": ["title", "devices", "description", "documentation", "comment", "icon", "iconProcess"], "Entity": ["entity"], "Views": ["viewmodeProvider", "mainView", "filterView", "editView", "previewView", "previewMultipleView", "lookupView"] }, defaults: { devices: "MOBILE|TABLET|DESKTOP" } },
-    neonView: { groups: { "General": ["title", "type", "description", "documentation", "icon", "iconProcess", "quickEntry", "filterable", "size", "isOverlay"], "Others": ["layout"] }, defaults: { filterable: "false", size: "NORMAL", isOverlay: "false" } },
-    entityServiceDefinition: { groups: { "General": ["name", "documentation"] }, defaults: {} },
-    serviceImplementation: { groups: { "General": ["name", "process"] }, defaults: {} }
-};
+const PROP_DICTIONARY={entity:{groups:{"General":["title","titlePlural","descriptionField","documentation","comment","metadata","useFavorites","recordRecipeSupported"],"Source":["recordContainer"],"Processes":["onInit","afterUIiInit","beforeOperatingState","afterOperatingState","onValidation","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess"],"Processes grants":["usePermissions","grantCreate","grantCreateProcess","grantUpdate","grantUpdateProcess","grantDelete","grantDeleteProcess"],"Color":["color","colorProcess"],"Icon":["icon","iconProcess","image","imageProcess","iconId","iconIdProcess"]},defaults:{useFavorites:"false",recordRecipeSupported:"false",usePermissions:"false",grantCreate:"true",grantUpdate:"true",grantDelete:"true"}},entityField:{groups:{"General":["name","title","titleProcess","descriptionField","documentation"],"Database":["linkedContext","linkedContextProcess","consumer"],"Tool tip":["tooltip","tooltipProcess"],"Placeholder":["placeholder","placeholderProcess"],"Processes":["valueProcess","displayValueProcess","onValidation","onValueChange","onValueChangeTypes","compareChangesWithRecordField"],"Value List":["dropDownProcess","textInputAllowed"],"Processing grants":["usePermissions"],"Color":["color","colorProcess"],"Activity":["state","stateProcess"],"Required field":["mandatory","mandatoryProcess"],"Single selection":["selectionMode","selectionModeProcess"],"Search":["groupable","preferredGroupOrder"],"Content Type":["contentType","contentTypeProcess"],"Formatting":["maxFieldSize","resolution","outputFormat","inputFormat"]},defaults:{state:"AUTO",mandatory:"false",selectionMode:"SINGLE",contentType:"TEXT",textInputAllowed:"false",usePermissions:"false",groupable:"false"}},entityActionField:{groups:{"General":["name","title","titleProcess","description","documentation"],"Tool tip":["tooltip","tooltipProcess"],"Processing grants":["usePermissions"],"Activity":["state","stateProcess"],"Icon":["iconId","iconIdProcess"],"Action":["onActionProcess","shortcut","isMenuAction","isObjectAction","selectionType","isSaveAction"]},defaults:{state:"EDITABLE",isMenuAction:"true",isObjectAction:"true",selectionType:"UNBOUND",usePermissions:"false"}},entityActionGroup:{groups:{"General":["name","title","titleProcess","description","documentation"],"Tool tip":["tooltip","tooltipProcess"],"Activity":["state","stateProcess"],"Icon":["iconId","iconIdProcess"]}},entityProvider:{groups:{"General":["name","titlePlural","titlePluralProcess","description","documentation","dependencies","lookupIdfield","uniqueProviderKeyProcess"],"Source":["recordcontainer","targetContextField","targetIdField","targetConsumerProcess","useAggregates","sortingField"],"Processing grants":["usePermissions"],"Search":["filterVariablesProcess","initFilterMergeMode"]},defaults:{useAggregates:"false",usePermissions:"true",initFilterMergeMode:"AND"}},entityConsumer:{groups:{"General":["title","description","documentation","entityName","fieldName","refreshParent","isOneToOneRelationship"],"Processes":["onValidation","externalInitFilterProcess"],"Activity":["state","stateProcess"],"Single selection":["selectionMode","selectionModeProcess"]},defaults:{state:"EDITABLE",selectionMode:"SINGLE",refreshParent:"false",isOneToOneRelationship:"false"}},entityParameter:{groups:{"General":["name","description","documentation","title","valueProcess","expose","mandatory"]},defaults:{expose:"false",mandatory:"false"}},dbRecordContainer:{groups:{"General":["title","type","description","documentation"],"Database":["alias","linkInformation","maximumDbRows","isPageable","isReadOnly","isRequireContainerFiltering","hasDependentRecords","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete"]},defaults:{type:"dbRecordContainer",isPageable:"true",isReadOnly:"false",isRequireContainerFiltering:"false",hasDependentRecords:"false"}},jDitoRecordContainer:{groups:{"General":["title","type","description","documentation"],"JDito":["jDitoRecordAlias","recordFieldMappings","aggregateFieldMappings","isPageable","supportsFilterExtensionGrouping","isFilterable","isGroupable","isRequireContainerFiltering","isSortable","contentProcess","rowCountProcess","hasDependentRecords","onInsert","onUpdate","onDelete"],"Cache":["cacheType","cacheKeyProcess"]},defaults:{type:"jDitoRecordContainer",isPageable:"false",isFilterable:"false",isGroupable:"false",isRequireContainerFiltering:"false",isSortable:"false",hasDependentRecords:"false"}},dbRecordFieldMapping:{groups:{"General":["entityField","type","recordfield","expression","columnAlias"],"Search":["isFilterable","isLookupFilter","maxFieldSize"]},defaults:{isFilterable:"false",isLookupFilter:"false"}},consumerMapping:{groups:{"General":["type","filterConditionProcess"],"Search":["filtertype","isFilterable","isLookupFilter"]},defaults:{isFilterable:"false",isLookupFilter:"false"}},filterExtension:{groups:{"General":["type","documentation","title","isFilterable","contentType","useConsumer","consumer","filterValuesProcess","filterConditionProcess","groupedRecordField","titleRecordField","isGroupable","groupQueryProcess"],"Search":["filtertype","isLookupfilter"]},defaults:{isFilterable:"true",useConsumer:"false",isGroupable:"false",filtertype:"EXTENDED"}},neonContext:{groups:{"General":["title","devices","description","documentation","comment","icon","iconProcess"],"Entity":["entity"],"Views":["viewmodeProvider","mainView","filterView","editView","previewView","previewMultipleView","lookupView"]},defaults:{devices:"MOBILE|TABLET|DESKTOP"}},neonView:{groups:{"General":["title","type","description","documentation","icon","iconProcess","quickEntry","filterable","size","isOverlay"],"Others":["layout"]},defaults:{filterable:"false",size:"NORMAL",isOverlay:"false"}},entityServiceDefinition:{groups:{"General":["name","documentation"]}},serviceImplementation:{groups:{"General":["name","process"]}}};
+const UI_CONFIG={neonContext:{i:'fa-sitemap',c:'#f78166',l:'Context'},entity:{i:'fa-database',c:'#fff',l:'Entity'},entityField:{i:'fa-table-columns',c:'#58a6ff',l:'Fields'},entityConsumer:{i:'fa-link',c:'#3fb950',l:'Consumers'},entityProvider:{i:'fa-sign-out-alt',c:'#ff7b72',l:'Providers'},entityParameter:{i:'fa-sliders',c:'#d2a8ff',l:'Parameters'},entityActionField:{i:'fa-bolt',c:'#d29922',l:'Actions'},entityActionGroup:{i:'fa-layer-group',c:'#d29922',l:'Action Groups'},entityServiceDefinition:{i:'fa-cogs',c:'#8957e5',l:'Services'},recordContainer:{i:'fa-server',c:'#e3b341',l:'Record Containers'},recordFieldMapping:{i:'fa-database',c:'#a5d6ff',l:'Mappings'},filterExtension:{i:'fa-filter',c:'#f0883e',l:'Filter Extensions'},ExtensionPoint:{i:'fa-puzzle-piece',c:'#ff79c6',l:'Extension Points'},neonView:{i:'fa-window-maximize',c:'#58a6ff',l:'Views'},serviceImplementation:{i:'fa-cog',c:'#8957e5',l:'Impls'}};
+const DESIGNER_ORDER=['recordContainer','entityField','entityParameter','entityProvider','entityConsumer','entityActionField','entityActionGroup','entityServiceDefinition','filterExtension'];
 
-const UI_CONFIG = {
-    neonContext: { i: 'fa-sitemap', c: '#f78166', l: 'Context' },
-    entity: { i: 'fa-database', c: '#ffffff', l: 'Entity' },
-    entityField: { i: 'fa-table-columns', c: '#58a6ff', l: 'Fields' },
-    entityConsumer: { i: 'fa-link', c: '#3fb950', l: 'Consumers' },
-    entityProvider: { i: 'fa-sign-out-alt', c: '#ff7b72', l: 'Providers' },
-    entityParameter: { i: 'fa-sliders', c: '#d2a8ff', l: 'Parameters' },
-    entityActionField: { i: 'fa-bolt', c: '#d29922', l: 'Actions' },
-    entityActionGroup: { i: 'fa-layer-group', c: '#d29922', l: 'Action Groups' },
-    entityServiceDefinition: { i: 'fa-cogs', c: '#8957e5', l: 'Services' },
-    recordContainer: { i: 'fa-server', c: '#e3b341', l: 'Record Containers' },
-    recordFieldMapping: { i: 'fa-database', c: '#a5d6ff', l: 'Mappings' },
-    filterExtension: { i: 'fa-filter', c: '#f0883e', l: 'Filter Extensions' },
-    ExtensionPoint: { i: 'fa-puzzle-piece', c: '#ff79c6', l: 'Extension Points' },
-    neonView: { i: 'fa-window-maximize', c: '#58a6ff', l: 'Views' },
-    serviceImplementation: { i: 'fa-cog', c: '#8957e5', l: 'Impls' }
-};
+window._nodeRegistry={};
+function registerNodePair(o,m){let id=(m?.id||o?.id); window._nodeRegistry[id]={o,m}; return id;}
+window.triggerDiffFromProp=(rId,p)=>{let d=window._nodeRegistry[rId]; loadDiff(p,d.o?.procs?.[p],d.m?.procs?.[p],d.m,d.o);};
 
-const DESIGNER_ORDER = ['recordContainer', 'entityField', 'entityParameter', 'entityProvider', 'entityConsumer', 'entityActionField', 'entityActionGroup', 'entityServiceDefinition', 'filterExtension'];
-
-window._nodeRegistry = {};
-function registerNodePair(o, m) { let id = (m?.id || o?.id); window._nodeRegistry[id] = { o, m }; return id; }
-window.triggerDiffFromProp = function(rId, p) { let d = window._nodeRegistry[rId]; loadDiff(p, d.o?.procs?.[p], d.m?.procs?.[p], d.m, d.o); }
-
-// --- PROJECT ENGINE ---
 class AditoProject {
-    constructor(path, name) { this.rootPath = path; this.name = name; this.files = new Map(); this.entities = new Set(); this.contextMap = new Map(); this.viewRefs = {}; this.viewRoles = {}; this.contextViews = new Map(); this.customViewsMod = new Set(); }
-    
-    async index() {
-        if (!fs) return; 
-        this.files.clear(); this.entities.clear(); this.contextMap.clear(); this.viewRefs = {}; this.viewRoles = {}; this.contextViews.clear(); this.customViewsMod.clear();
-        this._walk(this.rootPath);
-        
-        for (const [key, obj] of this.files.entries()) {
-            if (key.endsWith('_entity.aod') && key.includes('entity/')) {
-                this.entities.add(path.basename(obj.fullPath, '.aod'));
-            }
-            if (key.endsWith('.aod') && key.includes('neoncontext/')) {
-                const txt = await this.readText(obj.fullPath);
-                if(txt) { 
-                    const match = txt.match(/<entity>([^<]+)<\/entity>/); 
-                    if(match) {
-                        const entName = match[1].toLowerCase();
-                        const ctxName = path.basename(obj.fullPath, '.aod');
-                        this.contextMap.set(entName, ctxName); 
-                        
-                        if(!this.contextViews.has(entName)) this.contextViews.set(entName, new Set());
-                        const vSet = this.contextViews.get(entName);
-                        
-                        ['mainView', 'filterView', 'editView', 'previewView', 'previewMultipleView', 'lookupView'].forEach(tag => {
-                            let r = new RegExp(`<${tag}>([^<]+)<\\/${tag}>`, 'g');
-                            let m; while((m = r.exec(txt)) !== null) {
-                                vSet.add(m[1]); this.viewRoles[m[1]] = tag;
-                                if(!this.viewRefs[m[1]]) this.viewRefs[m[1]] = new Set();
-                                this.viewRefs[m[1]].add(`Context: ${ctxName}`);
-                            }
-                        });
-                        
-                        let refR = /<neonViewReference>[\s\S]*?<view>([^<]+)<\/view>[\s\S]*?<\/neonViewReference>/g;
-                        let m; while((m = refR.exec(txt)) !== null) {
-                            vSet.add(m[1]);
-                            if(!this.viewRefs[m[1]]) this.viewRefs[m[1]] = new Set();
-                            this.viewRefs[m[1]].add(`Context: ${ctxName}`);
-                        }
-                    }
-                }
+    constructor(p,n){this.rootPath=p; this.name=n; this.files=new Map(); this.entities=new Set(); this.contextMap=new Map(); this.viewRefs={}; this.viewRoles={}; this.contextViews=new Map(); this.customViewsMod=new Set();}
+    async index(){
+        if(!fs)return; this.files.clear(); this.entities.clear(); this.contextMap.clear(); this.viewRefs={}; this.viewRoles={}; this.contextViews.clear(); this.customViewsMod.clear(); this._walk(this.rootPath);
+        for(const [k,o] of this.files){
+            if(k.endsWith('_entity.aod')&&k.includes('entity/')) this.entities.add(path.basename(o.fullPath,'.aod'));
+            if(k.endsWith('.aod')&&k.includes('neoncontext/')){
+                const t=await this.readText(o.fullPath); if(!t)continue;
+                const m=t.match(/<entity>([^<]+)<\/entity>/); if(!m)continue;
+                const e=m[1].toLowerCase(), c=path.basename(o.fullPath,'.aod'); this.contextMap.set(e,c);
+                if(!this.contextViews.has(e))this.contextViews.set(e,new Set()); const vS=this.contextViews.get(e);
+                ['mainView','filterView','editView','previewView','previewMultipleView','lookupView'].forEach(tag=>{
+                    let r=new RegExp(`<${tag}>([^<]+)<\\/${tag}>`,'g'), mm; while((mm=r.exec(t))!==null){ vS.add(mm[1]); this.viewRoles[mm[1]]=tag; (this.viewRefs[mm[1]]=this.viewRefs[mm[1]]||new Set()).add(`Context: ${c}`); }
+                });
+                let refR=/<neonViewReference>[\s\S]*?<view>([^<]+)<\/view>[\s\S]*?<\/neonViewReference>/g, rm;
+                while((rm=refR.exec(t))!==null) { vS.add(rm[1]); (this.viewRefs[rm[1]]=this.viewRefs[rm[1]]||new Set()).add(`Context: ${c}`); }
             }
         }
-
-        for (const [key, obj] of this.files.entries()) {
-            if (key.includes('modification/') && key.endsWith('.aod')) {
-                const txt = await this.readText(obj.fullPath);
-                if (txt && txt.includes('<modelType>neonContext</modelType>')) {
-                    const ctxMatch = txt.match(/<modelName>([^<]+)<\/modelName>/);
-                    if (ctxMatch) {
-                        const ctxName = ctxMatch[1];
-                        const entName = [...this.contextMap.entries()].find(([e, c]) => c === ctxName)?.[0];
-                        if (entName) {
-                            let vSet = this.contextViews.get(entName);
-                            if(!vSet) { vSet = new Set(); this.contextViews.set(entName, vSet); }
-                            
-                            let pathMatch = txt.match(/<path>[^\/]+\/(mainView|filterView|editView|previewView|previewMultipleView|lookupView)<\/path>/);
-                            
-                            let viewMatches = [...txt.matchAll(/<(?:view|value)>([^<]+_view)<\/(?:view|value)>/g)];
-                            viewMatches.forEach(m => {
-                                let vName = m[1].trim(); vSet.add(vName);
-                                if(!this.viewRefs[vName]) this.viewRefs[vName] = new Set();
-                                this.viewRefs[vName].add(`Context: ${ctxName}`);
-                                if(pathMatch) this.viewRoles[vName] = pathMatch[1];
-                                this.customViewsMod.add(vName);
-                            });
-                        }
-                    }
+        for(const [k,o] of this.files){
+            if(k.includes('modification/')&&k.endsWith('.aod')){
+                const t=await this.readText(o.fullPath);
+                if(t&&t.includes('<modelType>neonContext</modelType>')){
+                    const m=t.match(/<modelName>([^<]+)<\/modelName>/); if(!m)continue;
+                    const cN=m[1], eN=[...this.contextMap.entries()].find(([e,c])=>c===cN)?.[0]; if(!eN)continue;
+                    let vS=this.contextViews.get(eN); if(!vS)this.contextViews.set(eN,vS=new Set());
+                    let pM=t.match(/<path>[^\/]+\/(mainView|filterView|editView|previewView|previewMultipleView|lookupView)<\/path>/);
+                    [...t.matchAll(/<(?:view|value)>([^<]+_view)<\/(?:view|value)>/g)].forEach(mm=>{
+                        let v=mm[1].trim(); vS.add(v); (this.viewRefs[v]=this.viewRefs[v]||new Set()).add(`Context: ${cN}`); if(pM)this.viewRoles[v]=pM[1]; this.customViewsMod.add(v);
+                    });
                 }
             }
         }
     }
-    
-    _walk(dir) {
-        try { fs.readdirSync(dir).forEach(file => {
-            const fp = path.join(dir, file);
-            if (fs.statSync(fp).isDirectory()) { 
-                if (!['dist', 'node_modules_ignored', '.git'].includes(file)) this._walk(fp); 
-            } else { 
-                let relP = fp.substring(this.rootPath.length + 1).replace(/\\/g, '/');
-                this.files.set(relP.toLowerCase(), { path: relP, fullPath: fp }); 
-            }
-        }); } catch (e) {}
-    }
-    async readText(fp) { return fs.existsSync(fp) ? fs.readFileSync(fp, 'utf-8') : null; }
-    async readXml(fp) { const t = await this.readText(fp); return t ? new DOMParser().parseFromString(t, "text/xml").documentElement : null; }
-    findFile(p) { const s = p.toLowerCase().replace('%aditoprj%/', ''); for(const [k, v] of this.files.entries()) if(k.endsWith(s)) return v; return null; }
+    _walk(d){ try{fs.readdirSync(d).forEach(f=>{let fp=path.join(d,f); if(fs.statSync(fp).isDirectory()){if(!['dist','node_modules_ignored','.git'].includes(f))this._walk(fp);}else{let rp=fp.substring(this.rootPath.length+1).replace(/\\/g,'/');this.files.set(rp.toLowerCase(),{path:rp,fullPath:fp});}});}catch(e){} }
+    async readText(fp){return fs.existsSync(fp)?fs.readFileSync(fp,'utf-8'):null;}
+    async readXml(fp){const t=await this.readText(fp);return t?new DOMParser().parseFromString(t,"text/xml").documentElement:null;}
+    findFile(p){const s=p.toLowerCase().replace('%aditoprj%/',''); for(const [k,v] of this.files)if(k.endsWith(s))return v; return null;}
 }
 
-let projOrig = null, projMod = null, projTemplate = null;
-let state = { 
-    origData: null, 
-    modData: null, 
-    templateData: null,
-    compareMode: 'modular', // 'modular' or 'template'
-    diffViewInfo: null, 
-    currentMode: 'custom', 
-    treeState: { expanded: new Set(), activeId: null }, 
-    currentViewXml: {} 
-};
+let projOrig=null, projMod=null, projTemplate=null;
+let state={rawOrigData:null, rawModData:null, rawTemplateData:null, origData:null, modData:null, templateData:null, origTemplateData:null, compareMode:'modular', diffViewInfo:null, currentMode:'custom', treeState:{expanded:new Set(),activeId:null}, currentViewXml:{}};
 
-async function loadProject(inputEl, projRefName, btnId) {
-    if(!inputEl.value) return;
-    const btn = S(btnId); btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Lade...`;
-    await new Promise(r => setTimeout(r, 50)); 
-    let p = new AditoProject(inputEl.value, projRefName); await p.index();
-    if(projRefName === "Original") projOrig = p; 
-    else if(projRefName === "Modular") projMod = p;
-    else if(projRefName === "Template") projTemplate = p;
-    btn.innerHTML = `<i class="fa-solid fa-check text-success"></i> ${projRefName}`; checkReady();
+async function loadProject(el,ref,btnId){
+    if(!el.value)return; const btn=S(btnId); btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Lade...`; await new Promise(r=>setTimeout(r,50));
+    let p=new AditoProject(el.value,ref); await p.index(); let fN=typeof path!=='undefined'&&path?path.basename(el.value):el.value.split(/[\\/]/).pop(), px="";
+    if(ref==="Original"){projOrig=p;window.projNameOrig=fN;px="1. ";}else if(ref==="Modular"){projMod=p;window.projNameMod=fN;px="2. ";}else{projTemplate=p;window.projNameTpl=fN;px="3. ";}
+    btn.innerHTML=`<i class="fa-solid fa-check text-success"></i> ${px}${ref}: ${fN}`; btn.title=el.value; checkReady();
 }
-S('f1').onchange = (e) => loadProject(e.target, "Original", 'btn-f1');
-S('f2').onchange = (e) => loadProject(e.target, "Modular", 'btn-f2');
-S('f3').onchange = (e) => loadProject(e.target, "Template", 'btn-f3');
+S('f1').onchange=e=>loadProject(e.target,"Original",'btn-f1'); S('f2').onchange=e=>loadProject(e.target,"Modular",'btn-f2'); S('f3').onchange=e=>loadProject(e.target,"Template",'btn-f3');
 
-function checkReady() {
-    S('file-status').textContent = `${(projOrig?.files.size||0) + (projMod?.files.size||0) + (projTemplate?.files.size||0)} Dateien geladen.`;
-    if (projOrig || projMod || projTemplate) {
-        const ents = new Set([...(projOrig?.entities||[]), ...(projMod?.entities||[]), ...(projTemplate?.entities||[])]);
-        const sel = S('entitySelect'); sel.innerHTML = '<option value="">Entity auswählen...</option>';
-        [...ents].sort().forEach(e => sel.add(new Option(e, e)));
-        sel.disabled = false; S('btn-analyze').disabled = false; S('btn-reload').classList.remove('d-none');
+function checkReady(){
+    S('file-status').textContent=`${(projOrig?.files.size||0)+(projMod?.files.size||0)+(projTemplate?.files.size||0)} Dateien.`;
+    if(projOrig||projMod||projTemplate){
+        const sel=S('entitySelect'); sel.innerHTML='<option value="">Entity auswählen...</option>';
+        [...new Set([...(projOrig?.entities||[]),...(projMod?.entities||[]),...(projTemplate?.entities||[])])].sort().forEach(e=>sel.add(new Option(e,e)));
+        sel.disabled=false; S('btn-analyze').disabled=false; S('btn-reload').classList.remove('d-none');
     }
-    if (projOrig && projTemplate) {
-        S('tpl-toggle-container').classList.remove('d-none');
-    }
+    if(projOrig&&projTemplate) S('tpl-toggle-container').classList.remove('d-none');
 }
 
-// Hilfsfunktion: Speichert den DOM Tree-State, damit Ordner beim Neuladen/Modus-Wechsel offen bleiben
-function saveTreeState() {
-    state.treeState.expanded.clear(); 
-    document.querySelectorAll('.tree-row:not(.collapsed)').forEach(el => { 
-        if(el.dataset.id) state.treeState.expanded.add(el.dataset.id); 
+function filterTree(q){
+    const rL=document.querySelectorAll('.tree-row:not(.group-header)'), hL=document.querySelectorAll('.group-header');
+    let isR=q.includes('%'), reg=isR?new RegExp('^'+q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,'\\$&').replace(/%/g,'.*')+'$','i'):null, qL=isR?"":q.toLowerCase();
+    rL.forEach(r=>{
+        if((isR?reg.test(r.dataset.name||""):(r.dataset.name||"").toLowerCase().includes(qL))){
+            r.style.display=''; let p=r.closest('.tree-sub');
+            while(p){let pr=p.previousElementSibling; if(pr&&pr.classList.contains('tree-row')&&q!==''){pr.classList.remove('collapsed'); pr.style.display='';} p=p.parentElement.closest('.tree-sub');}
+        } else r.style.display='none';
     });
-    let active = document.querySelector('.tree-row.active');
-    if(active) state.treeState.activeId = active.dataset.id;
-}
-
-function toggleMode() {
-    state.compareMode = S('tplToggle').checked ? 'template' : 'modular';
-    
-    saveTreeState(); // Zuvor geklappte Elemente merken
-    
-    if(state.compareMode === 'template') {
-        document.body.classList.add('template-mode');
-    } else {
-        document.body.classList.remove('template-mode');
-    }
-    
-    renderTree();
-}
-
-function renderTreeStateful() {
-    saveTreeState(); // Wenn z.B. "Ignore title diffs" geklickt wird
-    renderTree();
-}
-
-// --- PARSER ---
-class TreeNode {
-    constructor(name, type, file, id) { 
-        this.id = id; this.name = name; this.type = type; this.file = file; 
-        this.props = {}; this.coreProps = {};
-        this.procs = {}; this.coreProcs = {};
-        this.procContents = {}; this.coreProcContents = {}; 
-        this.children = []; 
-        this.isCustom = false;
-        this.customProps = new Set();
-        this.customProcs = new Set();
-        this.isDeleted = false; this.isExt = false; this.rawXml = null; 
-    }
-}
-
-function extractTemplates(xml) {
-    let tpls = { items: {}, order: [] };
-    if(!xml) return tpls;
-    let children = xml.getElementsByTagName('children')[0]; if(!children) return tpls;
-    Array.from(children.childNodes).filter(n=>n.nodeType===1).forEach(c => {
-        let type = c.nodeName; 
-        let nameNode = c.getElementsByTagName('name')[0]; 
-        let name = nameNode ? nameNode.textContent.trim() : type;
-        
-        if (type === 'neonViewReference') {
-            let vNode = c.getElementsByTagName('view')[0];
-            if (vNode) name = vNode.textContent.trim();
+    hL.forEach(h=>{
+        if(q===''){h.style.display='';return;} let ns=h.nextElementSibling;
+        if(ns&&ns.classList.contains('tree-sub')){
+            let v=Array.from(ns.querySelectorAll('.tree-row:not(.group-header)')).some(r=>r.style.display!=='none');
+            h.style.display=v?'':'none'; if(v)h.classList.remove('collapsed');
         }
+    });
+}
 
-        let props = {};
-        Array.from(c.childNodes).filter(n=>n.nodeType===1 && n.nodeName!=='name').forEach(sub => {
-            let val = sub.textContent.trim();
-            if(sub.firstElementChild) {
-                let parts = Array.from(sub.childNodes).filter(x => x.nodeType === 1).map(x => {
-                    let ef = x.getElementsByTagName('entityField')[0] || x.getElementsByTagName('view')[0] || x.getElementsByTagName('element')[0];
-                    if (ef) return ef.textContent.trim();
-                    let nNode = x.getElementsByTagName('name')[0]; if(nNode && nNode.textContent.length === 36) return ""; return x.textContent.trim();
-                }).filter(v => v);
-                val = parts.join(' • ');
-            } else if(val==="") { if(sub.hasAttribute('v')) val = sub.getAttribute('v'); else if(sub.hasAttribute('value')) val = sub.getAttribute('value'); }
-            props[sub.nodeName] = val;
+function saveTreeState(){ state.treeState.expanded.clear(); document.querySelectorAll('.tree-row:not(.collapsed)').forEach(el=>{if(el.dataset.id)state.treeState.expanded.add(el.dataset.id);}); let a=document.querySelector('.tree-row.active'); if(a)state.treeState.activeId=a.dataset.id; }
+function toggleMode(){ state.compareMode=S('tplToggle').checked?'template':'modular'; saveTreeState(); document.body.classList.toggle('template-mode',state.compareMode==='template'); renderTree(); }
+function renderTreeStateful(){ saveTreeState(); renderTree(); }
+
+class TreeNode { constructor(n,t,f,id){this.id=id; this.name=n; this.type=t; this.file=f; this.props={}; this.coreProps={}; this.procs={}; this.coreProcs={}; this.procContents={}; this.coreProcContents={}; this.children=[]; this.isCustom=false; this.customProps=new Set(); this.customProcs=new Set(); this.isDeleted=false; this.isExt=false; this.rawXml=null;} }
+
+function cloneNode(node) {
+    if(!node) return null; let n=new TreeNode(node.name, node.type, node.file, node.id);
+    n.props={...node.props}; n.coreProps={...node.coreProps}; n.procs={...node.procs}; n.coreProcs={...node.coreProcs}; n.procContents={...node.procContents}; n.coreProcContents={...node.coreProcContents};
+    n.isCustom=node.isCustom; n.customProps=new Set(node.customProps); n.customProcs=new Set(node.customProcs); n.isDeleted=node.isDeleted; n.isExt=node.isExt; n.rawXml=node.rawXml;
+    n.children=(node.children||[]).map(cloneNode); return n;
+}
+function cloneData(data) { return data?{entity:cloneNode(data.entity),context:cloneNode(data.context),views:(data.views||[]).map(cloneNode)}:null; }
+
+function extractTemplates(x){
+    let t={items:{},order:[]}; if(!x)return t; let ch=x.getElementsByTagName('children')[0]; if(!ch)return t;
+    Array.from(ch.childNodes).filter(n=>n.nodeType===1).forEach(c=>{
+        let typ=c.nodeName, nmN=c.getElementsByTagName('name')[0], nm=nmN?nmN.textContent.trim():typ;
+        if(typ==='neonViewReference'){let v=c.getElementsByTagName('view')[0]; if(v)nm=v.textContent.trim();}
+        let p={}; Array.from(c.childNodes).filter(n=>n.nodeType===1&&n.nodeName!=='name').forEach(s=>{
+            let v=s.textContent.trim();
+            if(s.firstElementChild) v=Array.from(s.childNodes).filter(x=>x.nodeType===1).map(x=>{let ef=x.getElementsByTagName('entityField')[0]||x.getElementsByTagName('view')[0]||x.getElementsByTagName('element')[0]; if(ef)return ef.textContent.trim(); let nN=x.getElementsByTagName('name')[0]; if(nN&&nN.textContent.length===36)return ""; return x.textContent.trim();}).filter(v=>v).join(' • ');
+            else if(v==="") v=s.getAttribute('v')||s.getAttribute('value')||"";
+            p[s.nodeName]=v;
         });
-        
-        let originalName = name;
-        while(getTplCI(tpls.items, name)) name += "_dup";
-        tpls.items[name] = { type: type, props: props, originalName: originalName };
-        tpls.order.push(name);
-    });
-    return tpls;
-}
-
-function mergeTemplateOrders(order1, order2) {
-    let merged = [];
-    let seen = new Set();
-    (order1 || []).forEach(n => { merged.push(n); seen.add(n.toLowerCase()); });
-    (order2 || []).forEach(n => {
-        if(!seen.has(n.toLowerCase())) { merged.push(n); seen.add(n.toLowerCase()); }
-    });
-    return merged;
+        let onm=nm; while(getTplCI(t.items,nm))nm+="_dup"; t.items[nm]={type:typ,props:p,originalName:onm}; t.order.push(nm);
+    }); return t;
 }
 
 function harmonizeExtensionPointsRecursive(origNode, modNode) {
-    if (!origNode || !modNode) return;
-
-    function alignToExt(sourceNode, targetNode) {
-        let targetExts = targetNode.children.filter(c => c.isExt);
-        targetExts.forEach(tExt => {
-            tExt.children.forEach(tChild => {
-                let sIdx = sourceNode.children.findIndex(c => c.name.toLowerCase() === tChild.name.toLowerCase() && c.type === tChild.type && !c.isExt);
-                if (sIdx > -1) {
-                    let sChild = sourceNode.children.splice(sIdx, 1)[0];
-                    let sExt = sourceNode.children.find(c => c.name.toLowerCase() === tExt.name.toLowerCase() && c.isExt);
-                    if (!sExt) {
-                        sExt = new TreeNode(tExt.name, tExt.type, sourceNode.file, sourceNode.id + '_' + tExt.name);
-                        sExt.isExt = true;
-                        sourceNode.children.push(sExt);
-                    }
-                    sExt.children.push(sChild);
-                }
-            });
+    if(!origNode||!modNode)return;
+    const align=(sN,tN)=>{ tN.children.filter(c=>c.isExt).forEach(tExt=>{
+        tExt.children.forEach(tChild=>{
+            let sIdx=sN.children.findIndex(c=>c.name.toLowerCase()===tChild.name.toLowerCase()&&c.type===tChild.type&&!c.isExt);
+            if(sIdx>-1){
+                let sChild=sN.children.splice(sIdx,1)[0], sExt=sN.children.find(c=>c.name.toLowerCase()===tExt.name.toLowerCase()&&c.isExt);
+                if(!sExt) sN.children.push(sExt=Object.assign(new TreeNode(tExt.name,tExt.type,sN.file,sN.id+'_'+tExt.name),{isExt:true}));
+                sExt.children.push(sChild);
+            }
         });
-    }
-
-    alignToExt(origNode, modNode);
-    alignToExt(modNode, origNode);
-
-    origNode.children.forEach(oChild => {
-        let mChild = findCaseInsensitive(modNode.children, oChild.name);
-        if (mChild && mChild.type === oChild.type) harmonizeExtensionPointsRecursive(oChild, mChild);
-    });
+    });};
+    align(origNode,modNode); align(modNode,origNode);
+    origNode.children.forEach(oC=>{ let mC=findCI(modNode.children,oC.name); if(mC&&mC.type===oC.type)harmonizeExtensionPointsRecursive(oC,mC); });
 }
 
-function hasCustomModDescendant(node) {
-    if (!node) return false;
-    if (node.customProcs?.size > 0 || node.customProps?.size > 0) return true;
-    for (let c of node.children || []) {
-        if (c.isCustom || hasCustomModDescendant(c)) return true;
-    }
-    return false;
-}
+function hasCustomModDescendant(n){ if(!n)return false; if(n.customProcs?.size>0||n.customProps?.size>0)return true; return (n.children||[]).some(c=>c.isCustom||hasCustomModDescendant(c)); }
 
-async function startAnalysis() { if(!S('entitySelect').value) return; state.treeState = { expanded: new Set(), activeId: null }; await performAnalysis(); }
-async function reloadEntity() {
-    if(!S('entitySelect').value) return;
-    saveTreeState(); // Aktuelle Baum-Struktur speichern
-    
-    S('tree-container').innerHTML = '<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Re-Indexierung der Projekte...</div>';
-    await new Promise(r => setTimeout(r, 50));
-    
-    if (projOrig) await projOrig.index();
-    if (projMod) await projMod.index();
-    if (projTemplate) await projTemplate.index();
-
-    await performAnalysis();
-}
+async function startAnalysis(){if(!S('entitySelect').value)return; state.treeState={expanded:new Set(),activeId:null}; await performAnalysis();}
+async function reloadEntity(){if(!S('entitySelect').value)return; saveTreeState(); S('tree-container').innerHTML='<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Re-Index...</div>'; await new Promise(r=>setTimeout(r,50)); if(projOrig)await projOrig.index(); if(projMod)await projMod.index(); if(projTemplate)await projTemplate.index(); await performAnalysis();}
 
 async function performAnalysis() {
-    const entName = S('entitySelect').value;
-    S('tree-container').innerHTML = '<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Lese Dateien & analysiere Code...</div>';
-    await new Promise(r => setTimeout(r, 50));
-    
-    state.origData = await buildData(projOrig, entName); 
-    state.modData = await buildData(projMod, entName); 
-    if (projTemplate) state.templateData = await buildData(projTemplate, entName);
-    
-    harmonizeExtensionPointsRecursive(state.origData.entity, state.modData.entity);
-    if(state.templateData) harmonizeExtensionPointsRecursive(state.templateData.entity, state.origData.entity);
-    
+    const eN=S('entitySelect').value; S('tree-container').innerHTML='<div class="p-5 text-center text-secondary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-3"></i><br>Lese...</div>'; await new Promise(r=>setTimeout(r,50));
+    state.rawOrigData=await buildData(projOrig,eN); state.rawModData=await buildData(projMod,eN); if(projTemplate)state.rawTemplateData=await buildData(projTemplate,eN);
+    state.origData=cloneData(state.rawOrigData); state.modData=cloneData(state.rawModData); harmonizeExtensionPointsRecursive(state.origData.entity,state.modData.entity);
+    if(projTemplate){ state.templateData=cloneData(state.rawTemplateData); state.origTemplateData=cloneData(state.rawOrigData); harmonizeExtensionPointsRecursive(state.templateData.entity,state.origTemplateData.entity); }
     renderTree();
 }
 
-async function buildData(project, entName) {
-    if (!project) return { entity: null, context: null, views: [] };
-    const entLower = entName.toLowerCase(); const ctxName = project.contextMap.get(entLower);
-    let res = { entity: new TreeNode(entName, "entity", null, 'root_ent'), context: null, views: [] };
-    
-    let allowedViews = project.contextViews.get(entLower) || new Set();
-
-    for (const [key, fileObj] of project.files.entries()) {
-        if (!key.endsWith('.aod') || key.includes('modification/')) continue;
-        
-        if (key.includes(`/${entLower}.aod`) || key.includes(`/${entLower}_entity/`)) {
-            const xml = await project.readXml(fileObj.fullPath);
-            if (xml && xml.nodeName === 'entity') { res.entity.file = fileObj; await extractNodeDataAsync(xml, res.entity, project); }
-            if (xml) await parseWalkerAsync(xml, res.entity, fileObj, false, project);
-        } else if (ctxName && key.includes(`neoncontext/${ctxName.toLowerCase()}.aod`)) {
-            const xml = await project.readXml(fileObj.fullPath);
-            if(xml) { res.context = new TreeNode(ctxName, "neonContext", fileObj, 'root_ctx'); await extractNodeDataAsync(xml, res.context, project); }
-        } else if (key.includes('neonview/')) {
-            let vName = path.basename(fileObj.fullPath, '.aod');
-            let isAllowed = Array.from(allowedViews).some(v => v.toLowerCase() === vName.toLowerCase());
-            if (isAllowed) {
-                const xml = await project.readXml(fileObj.fullPath);
-                if(xml) { 
-                    let vn = new TreeNode(vName, "neonView", fileObj, 'view_'+vName); vn.rawXml = xml; 
-                    let isModCust = Array.from(project.customViewsMod).some(v => v.toLowerCase() === vName.toLowerCase());
-                    if(isModCust) vn.isCustom = true;
-                    vn.refContexts = Array.from(getRefsCI(project.viewRefs, vName));
-                    await extractNodeDataAsync(xml, vn, project); res.views.push(vn); 
-                }
-            }
-        }
+async function buildData(p,eN) {
+    if(!p)return{entity:null,context:null,views:[]}; const eL=eN.toLowerCase(), cN=p.contextMap.get(eL); let res={entity:new TreeNode(eN,"entity",null,'root_ent'),context:null,views:[]}, aV=p.contextViews.get(eL)||new Set();
+    for(const [k,fo] of p.files){
+        if(!k.endsWith('.aod')||k.includes('modification/'))continue;
+        if(k.includes(`/${eL}.aod`)||k.includes(`/${eL}_entity/`)){ const x=await p.readXml(fo.fullPath); if(x&&x.nodeName==='entity'){res.entity.file=fo; await extractNodeDataAsync(x,res.entity,p);} if(x)await parseWalkerAsync(x,res.entity,fo,false,p); }
+        else if(cN&&k.includes(`neoncontext/${cN.toLowerCase()}.aod`)){ const x=await p.readXml(fo.fullPath); if(x){res.context=new TreeNode(cN,"neonContext",fo,'root_ctx'); await extractNodeDataAsync(x,res.context,p);} }
+        else if(k.includes('neonview/')){ let vN=path.basename(fo.fullPath,'.aod'); if([...aV].some(v=>v.toLowerCase()===vN.toLowerCase())){ const x=await p.readXml(fo.fullPath); if(x){ let vn=new TreeNode(vN,"neonView",fo,'view_'+vN); vn.rawXml=x; if([...p.customViewsMod].some(v=>v.toLowerCase()===vN.toLowerCase()))vn.isCustom=true; vn.refContexts=[...getRefsCI(p.viewRefs,vN)]; await extractNodeDataAsync(x,vn,p); res.views.push(vn); } } }
     }
-
-    if (project.name === "Modular") {
-        for (const [key, fileObj] of project.files.entries()) {
-            if (key.includes('modification/') && key.endsWith('.aod')) {
-                const xml = await project.readXml(fileObj.fullPath);
-                if (xml) {
-                    const modTarget = xml.getElementsByTagName('modelName')[0]?.textContent;
-                    if(modTarget) {
-                        if (modTarget.toLowerCase() === entLower) await applyModAsync(xml, res.entity, fileObj, project);
-                        else { 
-                            let targetView = findCaseInsensitive(res.views, modTarget);
-                            if(targetView) { targetView.isCustom = !fileObj.path.includes('node_modules'); } 
-                        }
-                    }
-                }
-            }
-        }
-    }
+    if(p.name==="Modular"){ for(const [k,fo] of p.files){ if(k.includes('modification/')&&k.endsWith('.aod')){ const x=await p.readXml(fo.fullPath); if(x){ const mT=x.getElementsByTagName('modelName')[0]?.textContent; if(mT){ if(mT.toLowerCase()===eL)await applyModAsync(x,res.entity,fo,p); else{let tV=findCI(res.views,mT); if(tV)tV.isCustom=!fo.path.includes('node_modules');} } } } } }
     return res;
 }
 
-function getDeepValue(node) {
-    if (!node) return ""; 
-    let elements = Array.from(node.childNodes).filter(n => n.nodeType === 1 && n.nodeName === 'element');
-    if (elements.length > 0) return elements.map(el => el.textContent.trim()).join('|');
-    
-    let children = Array.from(node.childNodes).filter(n => n.nodeType === 1 && n.nodeName !== 'name');
-    if (children.length === 0) {
-        let v = node.textContent.trim();
-        if (v === "") {
-            if (node.hasAttribute('v')) v = node.getAttribute('v');
-            else if (node.hasAttribute('value')) v = node.getAttribute('value');
-        }
-        return v;
-    }
-    return getDeepValue(children[0]);
-}
+function getDeepValue(n){ if(!n)return""; let els=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName==='element'); if(els.length>0)return els.map(e=>e.textContent.trim()).join('|'); let ch=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName!=='name'); return ch.length===0?(n.textContent.trim()||n.getAttribute('v')||n.getAttribute('value')||""):getDeepValue(ch[0]); }
 
-async function extractNodeDataAsync(xml, targetNode, project) {
-    for(let c of Array.from(xml.childNodes)) {
-        if (c.nodeType === 1 && c.nodeName !== 'name' && !IGNORE_AS_PROPS.has(c.nodeName)) {
-            let val = "";
-            let elements = Array.from(c.childNodes).filter(n => n.nodeType === 1 && n.nodeName === 'element');
-            
-            if (elements.length > 0) {
-                val = elements.map(el => el.textContent.trim()).join('|');
-            } else if (c.firstElementChild) {
-                val = Array.from(c.childNodes).filter(sub => sub.nodeType===1 && sub.nodeName!=='name').map(sub => {
-                    let subVal = sub.textContent.trim();
-                    if(subVal==="" && sub.hasAttribute('v')) subVal = sub.getAttribute('v');
-                    if(subVal==="" && sub.hasAttribute('value')) subVal = sub.getAttribute('value');
-                    return `${sub.nodeName}: ${subVal}`;
-                }).join(' | ');
-            } else {
-                val = c.textContent.trim();
-                if (val === "") { 
-                    if (c.hasAttribute('v')) val = c.getAttribute('v'); 
-                    else if (c.hasAttribute('value')) val = c.getAttribute('value'); 
-                }
-            }
-            
-            if (ADITO_PROCESS_NAMES.has(c.nodeName)) {
-                targetNode.procs[c.nodeName] = val; 
-                let procPath = val; let f = null;
-                if (procPath === 'process.js' || procPath === './process.js') f = Array.from(project.files.values()).find(fl => fl.fullPath === path.join(path.dirname(targetNode.file.fullPath), 'process.js'));
-                else f = project.findFile(procPath);
-                
-                if(f) {
-                    let content = await project.readText(f.fullPath); targetNode.procContents[c.nodeName] = content;
-                }
-            } else targetNode.props[c.nodeName] = val;
+async function extractNodeDataAsync(x,tN,p){
+    for(let c of [...x.childNodes]){
+        if(c.nodeType===1&&c.nodeName!=='name'&&!IGNORE_AS_PROPS.has(c.nodeName)){
+            let v="", els=[...c.childNodes].filter(n=>n.nodeType===1&&n.nodeName==='element');
+            if(els.length>0)v=els.map(el=>el.textContent.trim()).join('|');
+            else if(c.firstElementChild)v=[...c.childNodes].filter(s=>s.nodeType===1&&s.nodeName!=='name').map(s=>`${s.nodeName}: ${s.textContent.trim()||s.getAttribute('v')||s.getAttribute('value')||""}`).join(' | ');
+            else v=c.textContent.trim()||c.getAttribute('v')||c.getAttribute('value')||"";
+            if(ADITO_PROCESS_NAMES.has(c.nodeName)){ tN.procs[c.nodeName]=v; let f=(v==='process.js'||v==='./process.js')?[...p.files.values()].find(fl=>fl.fullPath===path.join(path.dirname(tN.file.fullPath),'process.js')):p.findFile(v); if(f)tN.procContents[c.nodeName]=await p.readText(f.fullPath); } else tN.props[c.nodeName]=v;
         }
     }
 }
 
-async function parseWalkerAsync(xml, parentTree, fileObj, isCustom, project) {
-    for(let c of Array.from(xml.childNodes)) {
-        if (c.nodeType !== 1) continue;
-        let nodeNameLower = c.nodeName.toLowerCase();
-        let isExt = nodeNameLower.includes('extensionpoint') || 
-            (nodeNameLower !== 'entityservicedefinition' && nodeNameLower !== 'entityactiongroup' && Array.from(c.childNodes).some(n => n.nodeName.toLowerCase() === 'implementations'));
-        
-        if (isExt) {
-            let baseType = c.nodeName.replace('ExtensionPoint', ''); let impls = Array.from(c.childNodes).find(n => n.nodeName === 'implementations');
-            if(impls && impls.firstElementChild) baseType = impls.firstElementChild.nodeName;
-            const name = c.getElementsByTagName('name')[0]?.textContent || c.nodeName;
-            let ext = new TreeNode(name, baseType, fileObj, parentTree.id + '_' + name); ext.isExt = true; parentTree.children.push(ext);
-            if(impls) await parseWalkerAsync(impls, ext, fileObj, isCustom, project); continue;
-        }
-        if (XML_WRAPPERS.has(c.nodeName)) { await parseWalkerAsync(c, parentTree, fileObj, isCustom, project); continue; }
-        const nameNode = Array.from(c.childNodes).find(n => n.nodeName === 'name');
-        if (nameNode && !IGNORE_AS_PROPS.has(c.nodeName)) {
-            let type = c.nodeName; if(type.endsWith('RecordContainer')) type = 'recordContainer'; if(type.endsWith('RecordFieldMapping') || type === 'consumerMapping') type = 'recordFieldMapping';
-            let node = new TreeNode(nameNode.textContent.trim(), type, fileObj, parentTree.id + '_' + nameNode.textContent.trim());
-            node.isCustom = isCustom;
-            if(parentTree.type === 'ExtensionPoint') node.isExt = true;
-            await extractNodeDataAsync(c, node, project); parentTree.children.push(node); await parseWalkerAsync(c, node, fileObj, isCustom, project);
-        }
+async function parseWalkerAsync(x,pT,fo,isC,p){
+    for(let c of [...x.childNodes]){
+        if(c.nodeType!==1)continue; let nl=c.nodeName.toLowerCase(), isE=nl.includes('extensionpoint')||(nl!=='entityservicedefinition'&&nl!=='entityactiongroup'&&[...c.childNodes].some(n=>n.nodeName.toLowerCase()==='implementations'));
+        if(isE){ let bT=c.nodeName.replace('ExtensionPoint',''), impls=[...c.childNodes].find(n=>n.nodeName==='implementations'); if(impls&&impls.firstElementChild)bT=impls.firstElementChild.nodeName; const nm=c.getElementsByTagName('name')[0]?.textContent||c.nodeName; let ext=new TreeNode(nm,bT,fo,pT.id+'_'+nm); ext.isExt=true; pT.children.push(ext); if(impls)await parseWalkerAsync(impls,ext,fo,isC,p); continue; }
+        if(XML_WRAPPERS.has(c.nodeName)){await parseWalkerAsync(c,pT,fo,isC,p);continue;}
+        const nN=[...c.childNodes].find(n=>n.nodeName==='name');
+        if(nN&&!IGNORE_AS_PROPS.has(c.nodeName)){ let t=c.nodeName; if(t.endsWith('RecordContainer'))t='recordContainer'; if(t.endsWith('RecordFieldMapping')||t==='consumerMapping')t='recordFieldMapping'; let n=new TreeNode(nN.textContent.trim(),t,fo,pT.id+'_'+nN.textContent.trim()); n.isCustom=isC; if(pT.type==='ExtensionPoint')n.isExt=true; await extractNodeDataAsync(c,n,p); pT.children.push(n); await parseWalkerAsync(c,n,fo,isC,p); }
     }
 }
 
-async function applyModAsync(xml, rootTree, fileObj, project) {
-    const cType = xml.getElementsByTagName('changeType')[0]?.textContent; const pathTxt = xml.getElementsByTagName('path')[0]?.textContent || "";
-    const pathParts = pathTxt.split('/').filter(p => !XML_WRAPPERS.has(p) && p.toLowerCase() !== rootTree.name.toLowerCase());
-    const isCustom = !fileObj.path.includes('node_modules');
-    const findNode = (pathArr) => { 
-        let curr = rootTree; 
-        for(let p of pathArr) { 
-            let next = findCaseInsensitive(curr.children, p); 
-            if(!next) return null; curr = next; 
-        } 
-        return curr; 
-    };
-
-    if (cType === 'MODIFY') {
-        const propName = pathParts.pop(); let target = findNode(pathParts);
-        if(target) {
-            let valNode = xml.getElementsByTagName('value')[0]; let val = valNode ? getDeepValue(valNode) : "";
-            
-            if (Object.keys(target.coreProps).length === 0) Object.assign(target.coreProps, target.props);
-
-            if(ADITO_PROCESS_NAMES.has(propName)) {
-                target.coreProcContents[propName] = target.procContents[propName];
-                target.coreProcs[propName] = target.procs[propName];
-                target.procs[propName] = val; 
-                let f = project.findFile(val); if(f) {
-                    let content = await project.readText(f.fullPath); target.procContents[propName] = content;
-                }
-                if(isCustom) target.customProcs.add(propName);
-            } else {
-                target.props[propName] = val;
-                if(isCustom) target.customProps.add(propName);
-            }
-        }
-    } else if (cType === 'INSERT') {
-        const wrappers = xml.getElementsByTagName('modelValueWrapper');
-        if (wrappers.length > 0 && wrappers[0].firstElementChild) {
-            let inner = Array.from(wrappers[0].childNodes).find(n => n.nodeName === 'value');
-            if(inner && inner.firstElementChild) { let target = findNode(pathParts) || rootTree; await parseWalkerAsync(inner, target, fileObj, isCustom, project); }
-        }
-    } else if (cType === 'DELETE') { let target = findNode(pathParts); if(target) target.isDeleted = true; }
+async function applyModAsync(x,rT,fo,p){
+    const cT=x.getElementsByTagName('changeType')[0]?.textContent, pP=(x.getElementsByTagName('path')[0]?.textContent||"").split('/').filter(p=>!XML_WRAPPERS.has(p)&&p.toLowerCase()!==rT.name.toLowerCase()), isC=!fo.path.includes('node_modules');
+    const fN=a=>{let c=rT;for(let p of a){let n=findCI(c.children,p);if(!n)return null;c=n;}return c;};
+    if(cT==='MODIFY'){
+        const pN=pP.pop(); let t=fN(pP); if(t){ let vN=x.getElementsByTagName('value')[0], v=vN?getDeepValue(vN):""; if(Object.keys(t.coreProps).length===0)Object.assign(t.coreProps,t.props);
+        if(ADITO_PROCESS_NAMES.has(pN)){ t.coreProcContents[pN]=t.procContents[pN]; t.coreProcs[pN]=t.procs[pN]; t.procs[pN]=v; let f=p.findFile(v); if(f)t.procContents[pN]=await p.readText(f.fullPath); if(isC)t.customProcs.add(pN); } else{ t.props[pN]=v; if(isC)t.customProps.add(pN); } }
+    } else if(cT==='INSERT'){ const w=x.getElementsByTagName('modelValueWrapper'); if(w.length>0&&w[0].firstElementChild){ let i=[...w[0].childNodes].find(n=>n.nodeName==='value'); if(i&&i.firstElementChild)await parseWalkerAsync(i,fN(pP)||rT,fo,isC,p); } }
+    else if(cT==='DELETE'){ let t=fN(pP); if(t)t.isDeleted=true; }
 }
 
-function normalizeStr(s) { return (s||"").replace(/\s+/g, ''); }
-function sortProcs(a,b) { let iA = ADITO_PROCESS_NAMES_ARR.indexOf(a); let iB = ADITO_PROCESS_NAMES_ARR.indexOf(b); if(iA===-1) iA=999; if(iB===-1) iB=999; return iA - iB; }
+const normS=s=>(s||"").replace(/\s+/g,''), sortP=(a,b)=>{let i=ADITO_PROCESS_NAMES_ARR.indexOf(a), j=ADITO_PROCESS_NAMES_ARR.indexOf(b); return (i===-1?999:i)-(j===-1?999:j);};
+const getDeepUniq=(o,m)=>{let u=new Set(); const t=a=>(a||[]).forEach(n=>{if(!n.isExt)u.add(n.name.toLowerCase());if(n.isExt&&n.children)t(n.children);}); t(o);t(m); return u.size;};
 
-function getDeepUniqueCount(oNodes, mNodes) {
-    let uniqueElements = new Set();
-    function traverse(nodes) {
-        (nodes || []).forEach(n => {
-            if (!n.isExt) uniqueElements.add(n.name.toLowerCase());
-            if (n.isExt && n.children) traverse(n.children);
-        });
-    }
-    traverse(oNodes); traverse(mNodes);
-    return uniqueElements.size;
-}
-
-// --- RENDER HIERARCHY ---
 function renderTree() {
-    let isTpl = state.compareMode === 'template';
-    let leftData = isTpl ? state.templateData : state.origData;
-    let rightData = isTpl ? state.origData : state.modData;
-    
-    if(!leftData || !rightData) return;
-
-    const cont = S('tree-container'); cont.innerHTML = '';
-    let ctxNodeOrig = leftData.context, ctxNodeMod = rightData.context;
-    let entNodeOrig = leftData.entity, entNodeMod = rightData.entity;
-    let rootWrap = document.createElement('div'); let parentInd = 0;
-
-    let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
-
-    let viewsSub = document.createElement('div'); viewsSub.className = 'tree-sub';
-    let viewsHasC = false, viewsHasP = false;
-    if (leftData.views.length > 0 || rightData.views.length > 0) {
-        let vNames = getUniqueNamesCI(leftData.views, rightData.views);
-        vNames.sort((a,b)=>a.localeCompare(b)).forEach(vn => { 
-            let childWrap = createUiNode(findCaseInsensitive(leftData.views, vn), findCaseInsensitive(rightData.views, vn), parentInd+1);
-            let cSt = childWrap.querySelector('.tree-row').dataset.st;
-            if(cSt === 'C' || cSt === 'D' || cSt === 'N') viewsHasC = true;
-            if(cSt === 'P') viewsHasP = true;
-            viewsSub.appendChild(childWrap); 
-        });
+    let isTpl=state.compareMode==='template', lD=isTpl?state.templateData:state.origData, rD=isTpl?state.origTemplateData:state.modData; if(!lD||!rD)return;
+    const cont=S('tree-container'); cont.innerHTML=''; let cO=lD.context, cM=rD.context, eO=lD.entity, eM=rD.entity, rW=document.createElement('div'), pI=0, ign=S('ignoreTitleToggle')?.checked;
+    let vS=document.createElement('div'); vS.className='tree-sub'; let vHC=false, vHP=false;
+    if(lD.views.length||rD.views.length) getUniq(lD.views,rD.views).sort((a,b)=>a.localeCompare(b)).forEach(vn=>{let cW=createUiNode(findCI(lD.views,vn),findCI(rD.views,vn),pI+1), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')vHC=true; if(cSt==='P')vHP=true; vS.appendChild(cW);});
+    let eSt='E', ePO={...eO?.props}, ePM={...eM?.props}; if(ign){delete ePO.title; delete ePM.title;}
+    if(JSON.stringify(ePO)!==JSON.stringify(ePM))eSt='C'; else for(let p of new Set([...Object.keys(eO?.procContents||{}),...Object.keys(eM?.procContents||{})])){if(normS(eO?.procContents[p])!==normS(eM?.procContents[p])){eSt='P';break;}}
+    let eSub=document.createElement('div'); eSub.className='tree-sub'; let eHC=false, eHP=false;
+    let ePNs=new Set([...Object.keys(eO?.procs||{}),...Object.keys(eM?.procs||{})]);
+    if(ePNs.size>0){
+        let hId='hdr_entprocs', hdr=createUiRow(pI+1,'fa-cogs',`Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${ePNs.size}</span>`,'E',false,false,'#c9d1d9',hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+        let pSub=document.createElement('div'); pSub.className='tree-sub';
+        [...ePNs].sort(sortP).forEach(p=>{let st='E',op=eO?.procContents[p],mp=eM?.procContents[p]; if(!op&&mp){st='N';eHP=true;}else if(op&&!mp){st='D';eHP=true;}else if(normS(op)!==normS(mp)){st='C';eHP=true;} let pr=createUiRow(pI+2,'fa-code',p,st,eM?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',eO.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,eO?.procs[p],eM?.procs[p],eM,eO);}; pSub.appendChild(pr);});
+        hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(pSub);
     }
-
-    let entSt = 'E'; let ePO = {...entNodeOrig?.props}; let ePM = {...entNodeMod?.props};
-    if (ignoreTitle) { delete ePO.title; delete ePM.title; }
-    
-    if(JSON.stringify(ePO) !== JSON.stringify(ePM)) entSt = 'C';
-    else {
-        let allEntProcs = new Set([...Object.keys(entNodeOrig?.procContents||{}), ...Object.keys(entNodeMod?.procContents||{})]);
-        for(let p of allEntProcs) { if(normalizeStr(entNodeOrig?.procContents[p]) !== normalizeStr(entNodeMod?.procContents[p])) { entSt = 'P'; break; } }
-    }
-
-    let entSub = document.createElement('div'); entSub.className = 'tree-sub';
-    let entHasC = false, entHasP = false;
-
-    let entPNames = new Set([...Object.keys(entNodeOrig?.procs||{}), ...Object.keys(entNodeMod?.procs||{})]);
-    if(entPNames.size > 0) {
-        let hdrId = 'hdr_entprocs';
-        let hdr = createUiRow(parentInd+1, 'fa-cogs', `Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${entPNames.size}</span>`, 'E', false, false, '#c9d1d9', hdrId);
-        hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
-        let procSub = document.createElement('div'); procSub.className = 'tree-sub';
-        
-        [...entPNames].sort(sortProcs).forEach(p => {
-            let pst = 'E', op = entNodeOrig?.procContents[p], mp = entNodeMod?.procContents[p]; 
-            if(!op && mp) { pst = 'N'; entHasP = true; } else if(op && !mp) { pst = 'D'; entHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; entHasP = true; }
-            let isProcCustom = entNodeMod?.customProcs?.has(p) || false;
-            let pr = createUiRow(parentInd+2, 'fa-code', p, pst, isProcCustom, false, '#58a6ff', entNodeOrig.id+'_'+p, "");
-            pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
-            pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, entNodeOrig?.procs[p], entNodeMod?.procs[p], entNodeMod, entNodeOrig); };
-            procSub.appendChild(pr);
-        });
-        hdr.onclick = () => hdr.classList.toggle('collapsed');
-        entSub.appendChild(hdr); entSub.appendChild(procSub);
-    }
-
-    DESIGNER_ORDER.forEach(gType => {
-        let oNodes = entNodeOrig?.children.filter(c => c.type === gType || (gType==='recordContainer' && c.type.endsWith('RecordContainer'))) || [];
-        let mNodes = entNodeMod?.children.filter(c => c.type === gType || (gType==='recordContainer' && c.type.endsWith('RecordContainer'))) || [];
-        
-        let allN = getUniqueNamesCI(oNodes, mNodes); 
-        if(allN.length === 0) return;
-
-        let totalCount = getDeepUniqueCount(oNodes, mNodes);
-
-        let conf = UI_CONFIG[gType] || { i: 'fa-folder', c: '#8b949e', l: gType }; let hdrId = 'hdr_' + gType;
-        let hdr = createUiRow(parentInd+1, conf.i, `${conf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${totalCount}</span>`, 'E', false, false, conf.c, hdrId);
-        hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
-
-        let sub = document.createElement('div'); sub.className = 'tree-sub';
-        allN.sort((a,b)=>a.localeCompare(b)).forEach(n => { 
-            let childWrap = createUiNode(findCaseInsensitive(oNodes, n), findCaseInsensitive(mNodes, n), parentInd+2); 
-            let cSt = childWrap.querySelector('.tree-row').dataset.st;
-            if(cSt === 'C' || cSt === 'D' || cSt === 'N') entHasC = true;
-            if(cSt === 'P') entHasP = true;
-            sub.appendChild(childWrap); 
-        });
-        hdr.onclick = () => hdr.classList.toggle('collapsed'); entSub.appendChild(hdr); entSub.appendChild(sub);
+    DESIGNER_ORDER.forEach(g=>{
+        let oN=eO?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], mN=eM?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], aN=getUniq(oN,mN); if(!aN.length)return;
+        let cnf=UI_CONFIG[g]||{i:'fa-folder',c:'#8b949e',l:g}, hId='hdr_'+g, hdr=createUiRow(pI+1,cnf.i,`${cnf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${getDeepUniq(oN,mN)}</span>`,'E',false,false,cnf.c,hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+        let s=document.createElement('div'); s.className='tree-sub'; aN.sort((a,b)=>a.localeCompare(b)).forEach(n=>{let cW=createUiNode(findCI(oN,n),findCI(mN,n),pI+2), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')eHC=true; if(cSt==='P')eHP=true; s.appendChild(cW);});
+        hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(s);
     });
-
-    if (entSt === 'E' || entSt === 'P') {
-        if (entHasC) entSt = 'C'; else if (entHasP && entSt === 'E') entSt = 'P';
+    if(eSt==='E'||eSt==='P'){if(eHC)eSt='C';else if(eHP&&eSt==='E')eSt='P';}
+    if(cO||cM){
+        let act=cM||cO, st='E'; if(!cO&&cM)st='N';else if(cO&&!cM)st='D';else{let oP={...cO?.props},mP={...cM?.props};if(ign){delete oP.title;delete mP.title;}if(JSON.stringify(oP)!==JSON.stringify(mP))st='C';}
+        if(st==='E'||st==='P'){if(eSt==='C'||vHC)st='C';else if((eSt==='P'||vHP)&&st==='E')st='P';}
+        let cR=createUiRow(0,UI_CONFIG.neonContext.i,act.name,st,cM?.isCustom&&!isTpl,false,UI_CONFIG.neonContext.c,act.id,(!cM?.isCustom&&hasCustomModDescendant(cM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); cR.onclick=()=>{activateRow(cR);showProps(cO,cM);}; rW.appendChild(cR); pI=1;
     }
-
-    if (ctxNodeOrig || ctxNodeMod) {
-        let cO = ctxNodeOrig, cM = ctxNodeMod; let act = cM || cO;
-        let st = 'E'; if(!cO && cM) st = 'N'; else if(cO && !cM) st = 'D'; 
-        else {
-            let oP = {...cO?.props}; let mP = {...cM?.props};
-            if (ignoreTitle) { delete oP.title; delete mP.title; }
-            if(JSON.stringify(oP)!==JSON.stringify(mP)) st = 'C';
-        }
-        if (st === 'E' || st === 'P') {
-            if (entSt === 'C' || viewsHasC) st = 'C';
-            else if ((entSt === 'P' || viewsHasP) && st === 'E') st = 'P';
-        }
-        
-        let isCtxCustom = cM?.isCustom || false;
-        let ctxExtraHtml = "";
-        if (!isCtxCustom && hasCustomModDescendant(cM) && !isTpl) {
-            ctxExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
-        }
-        
-        let cRow = createUiRow(0, UI_CONFIG.neonContext.i, act.name, st, isCtxCustom && !isTpl, false, UI_CONFIG.neonContext.c, act.id, ctxExtraHtml);
-        cRow.onclick = () => { activateRow(cRow); showProps(cO, cM); }; rootWrap.appendChild(cRow); parentInd = 1;
-    }
-
-    let isEntCustom = entNodeMod?.isCustom || false;
-    let entExtraHtml = "";
-    if (!isEntCustom && hasCustomModDescendant(entNodeMod) && !isTpl) {
-        entExtraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
-    }
-    
-    let rRow = createUiRow(parentInd, UI_CONFIG.entity.i, entNodeOrig.name, entSt, isEntCustom && !isTpl, false, UI_CONFIG.entity.c, entNodeOrig.id, entExtraHtml);
-    rRow.classList.add('no-children'); 
-    rRow.onclick = () => { activateRow(rRow); showProps(entNodeOrig, entNodeMod); }; 
-    rootWrap.appendChild(rRow);
-    
-    Array.from(entSub.childNodes).forEach(n => rootWrap.appendChild(n));
-    cont.appendChild(rootWrap);
-
-    if (viewsSub.childNodes.length > 0) {
-        let vSt = 'E'; if (viewsHasC) vSt = 'C'; else if (viewsHasP) vSt = 'P';
-        let hdrId = 'hdr_views'; let hdr = createUiRow(parentInd, UI_CONFIG.neonView.i, `Views`, vSt, false, false, UI_CONFIG.neonView.c, hdrId);
-        hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hdrId)) hdr.classList.add('collapsed');
-        hdr.onclick = () => hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(viewsSub);
-    }
-    
-    if(state.treeState.activeId) { let aEl = document.querySelector(`[data-id="${state.treeState.activeId}"]`); if(aEl) aEl.click(); }
+    let rR=createUiRow(pI,UI_CONFIG.entity.i,eO.name,eSt,eM?.isCustom&&!isTpl,false,UI_CONFIG.entity.c,eO.id,(!eM?.isCustom&&hasCustomModDescendant(eM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); rR.classList.add('no-children'); rR.onclick=()=>{activateRow(rR);showProps(eO,eM);}; rW.appendChild(rR); [...eSub.childNodes].forEach(n=>rW.appendChild(n)); cont.appendChild(rW);
+    if(vS.childNodes.length){ let vSt=vHC?'C':(vHP?'P':'E'), hId='hdr_views', hdr=createUiRow(pI,UI_CONFIG.neonView.i,`Views`,vSt,false,false,UI_CONFIG.neonView.c,hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed'); hdr.onclick=()=>hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(vS); }
+    if(state.treeState.activeId)document.querySelector(`[data-id="${state.treeState.activeId}"]`)?.click(); if(S('treeSearch')?.value)filterTree(S('treeSearch').value);
 }
 
-function createUiNode(o, m, indent) {
-    let act = m || o; let st = 'E'; let ignoreTitle = S('ignoreTitleToggle') && S('ignoreTitleToggle').checked;
-    let isTpl = state.compareMode === 'template';
-    
-    let propChanged = false; let procChanged = false;
-    if(!o && m) { st = 'N'; propChanged = true; } else if(o && !m) { st = 'D'; propChanged = true; } else if(m?.isDeleted) { st = 'D'; propChanged = true; }
-    else {
-        let oProps = {...o?.props}; let mProps = {...m?.props};
-        if (ignoreTitle) { delete oProps.title; delete mProps.title; }
-        if(JSON.stringify(oProps)!==JSON.stringify(mProps)) propChanged = true;
-        
-        let allP = new Set([...Object.keys(o?.procContents||{}), ...Object.keys(m?.procContents||{})]);
-        for(let p of allP) { if(normalizeStr(o?.procContents[p]) !== normalizeStr(m?.procContents[p])) { procChanged = true; break; } }
-        
-        if(!propChanged && act.type === 'neonView') { 
-            let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
-            if(JSON.stringify(oTpls) !== JSON.stringify(mTpls)) propChanged = true;
-        }
-        if(propChanged) st = 'C'; else if(procChanged) st = 'P';
+function createUiNode(o,m,ind) {
+    let act=m||o, st='E', isTpl=state.compareMode==='template', pC=false, prC=false, ign=S('ignoreTitleToggle')?.checked;
+    if(!o&&m){st='N';pC=true;}else if((o&&!m)||m?.isDeleted){st='D';pC=true;}else if(act.isExt&&(!o||!o.children.length)&&m&&m.children.length){st='N';pC=true;}else if(act.isExt&&o&&o.children.length&&(!m||!m.children.length)){st='D';pC=true;}else{
+        let oP={...o?.props},mP={...m?.props}; if(ign){delete oP.title;delete mP.title;} if(JSON.stringify(oP)!==JSON.stringify(mP))pC=true;
+        for(let p of new Set([...Object.keys(o?.procContents||{}),...Object.keys(m?.procContents||{})])){if(normS(o?.procContents[p])!==normS(m?.procContents[p])){prC=true;break;}}
+        if(!pC&&act.type==='neonView'&&JSON.stringify(extractTemplates(o?.rawXml))!==JSON.stringify(extractTemplates(m?.rawXml)))pC=true; if(pC)st='C';else if(prC)st='P';
     }
-
-    let isCust = m?.isCustom || false; let isExt = m?.isExt || o?.isExt || false;
-    let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' }; if(isExt) conf = UI_CONFIG.ExtensionPoint;
-    
-    let cNames = getUniqueNamesCI(o?.children, m?.children);
-    let pNames = new Set([...Object.keys(o?.procs||{}), ...Object.keys(m?.procs||{})]);
-    
-    let sub = document.createElement('div'); sub.className = 'tree-sub';
-    let childHasC = false, childHasP = false;
-
-    [...pNames].sort(sortProcs).forEach(p => {
-        let pst = 'E', op = o?.procContents[p], mp = m?.procContents[p]; 
-        if(!op && mp) { pst = 'N'; childHasP = true; } else if(op && !mp) { pst = 'D'; childHasP = true; } else if(normalizeStr(op) !== normalizeStr(mp)) { pst = 'C'; childHasP = true; }
-        
-        let isProcCustom = m?.customProcs?.has(p) || false;
-        let pr = createUiRow(indent+1, 'fa-code', p, pst, isProcCustom && !isTpl, false, '#58a6ff', act.id+'_'+p, "");
-        pr.classList.add('no-children'); pr.style.fontStyle = 'italic';
-        pr.onclick = (e) => { e.stopPropagation(); activateRow(pr); loadDiff(p, o?.procs[p], m?.procs[p], m, o); };
-        sub.appendChild(pr);
+    let sub=document.createElement('div'); sub.className='tree-sub'; let cHc=false, cHp=false;
+    [...new Set([...Object.keys(o?.procs||{}),...Object.keys(m?.procs||{})])].sort(sortP).forEach(p=>{
+        let pst='E',op=o?.procContents[p],mp=m?.procContents[p]; if(!op&&mp){pst='N';cHp=true;}else if(op&&!mp){pst='D';cHp=true;}else if(normS(op)!==normS(mp)){pst='C';cHp=true;}
+        let pr=createUiRow(ind+1,'fa-code',p,pst,m?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',act.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,o?.procs[p],m?.procs[p],m,o);}; sub.appendChild(pr);
     });
-
-    cNames.sort((a,b)=>a.localeCompare(b)).forEach(cn => { 
-        let childWrap = createUiNode(findCaseInsensitive(o?.children, cn), findCaseInsensitive(m?.children, cn), indent+1);
-        let cSt = childWrap.querySelector('.tree-row').dataset.st;
-        if(cSt === 'C' || cSt === 'D' || cSt === 'N') childHasC = true;
-        if(cSt === 'P') childHasP = true;
-        sub.appendChild(childWrap); 
-    });
-
-    if (st === 'E' || st === 'P') {
-        if (childHasC) { st = 'C'; }
-        else if (childHasP && st === 'E') { st = 'P'; }
-    }
-
-    let extraHtml = "";
-    if (!isCust && hasCustomModDescendant(m) && !isTpl) {
-        extraHtml += `<i class="fa-solid fa-wrench ms-2" style="color: #d2a8ff; opacity: 0.8; font-size: 10px;" title="Enthält Modifikationen"></i>`;
-    }
-
-    if(act.type === 'neonView') {
-        let activeProjLeft = isTpl ? projTemplate : projOrig;
-        let activeProjRight = isTpl ? projOrig : projMod;
-        let role = activeProjRight?.viewRoles?.[act.name] || activeProjLeft?.viewRoles?.[act.name];
-        if(role) extraHtml += `<span class="badge bg-primary ms-2" style="font-size:9px">${role}</span>`;
-        let refs = new Set([...getRefsCI(activeProjLeft?.viewRefs, act.name), ...getRefsCI(activeProjRight?.viewRefs, act.name)]).size;
-        if(refs > 0) extraHtml += `<span class="badge bg-secondary ms-2" style="font-size:9px; border:1px solid #30363d;" title="Referenz-Zähler"><i class="fa-solid fa-link"></i> ${refs}</span>`;
-    }
-
-    let row = createUiRow(indent, conf.i, act.name, st, isCust && !isTpl, isExt, conf.c, act.id, extraHtml);
-    if(!state.treeState.expanded.has(act.id)) row.classList.add('collapsed');
-
-    if(sub.childNodes.length === 0) { row.classList.add('no-children'); row.onclick = () => { activateRow(row); showProps(o, m); }; } 
-    else { row.onclick = (e) => { if(e.target.classList.contains('toggle-icon')) { e.stopPropagation(); row.classList.toggle('collapsed'); } else { activateRow(row); showProps(o, m); } }; }
-
-    let wrap = document.createElement('div'); wrap.appendChild(row); wrap.appendChild(sub); return wrap;
+    getUniq(o?.children,m?.children).sort((a,b)=>a.localeCompare(b)).forEach(cn=>{let cW=createUiNode(findCI(o?.children,cn),findCI(m?.children,cn),ind+1), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')cHc=true; if(cSt==='P')cHp=true; sub.appendChild(cW);});
+    if(st==='E'||st==='P'){if(cHc)st='C';else if(cHp&&st==='E')st='P';}
+    let ex=(!m?.isCustom&&hasCustomModDescendant(m)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':"";
+    if(act.type==='neonView'){let r=(isTpl?projOrig:projMod)?.viewRoles?.[act.name]||(isTpl?projTemplate:projOrig)?.viewRoles?.[act.name]; if(r)ex+=`<span class="badge bg-primary ms-2" style="font-size:9px">${r}</span>`; let ref=new Set([...getRefsCI((isTpl?projTemplate:projOrig)?.viewRefs,act.name),...getRefsCI((isTpl?projOrig:projMod)?.viewRefs,act.name)]).size; if(ref)ex+=`<span class="badge bg-secondary ms-2" style="font-size:9px;border:1px solid #30363d;"><i class="fa-solid fa-link"></i> ${ref}</span>`;}
+    let cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'};
+    let row=createUiRow(ind,cnf.i,act.name,st,m?.isCustom&&!isTpl,m?.isExt||o?.isExt,cnf.c,act.id,ex); if(!state.treeState.expanded.has(act.id))row.classList.add('collapsed');
+    if(!sub.childNodes.length){row.classList.add('no-children'); row.onclick=()=>{activateRow(row);showProps(o,m);};} else row.onclick=e=>{if(e.target.classList.contains('toggle-icon')){e.stopPropagation();row.classList.toggle('collapsed');}else{activateRow(row);showProps(o,m);}};
+    let w=document.createElement('div'); w.appendChild(row); w.appendChild(sub); return w;
 }
 
-function createUiRow(ind, ic, txt, st, cust, ext, col, id, extraHTML = "") {
-    const d = document.createElement('div'); d.className = 'tree-row'; d.style.paddingLeft = `${(ind * 20) + 10}px`; if(id) d.dataset.id = id;
-    d.dataset.st = st;
-    const isDull = (st === 'E');
-    let isTpl = state.compareMode === 'template';
-    let diffCol = isTpl ? '#f85149' : '#d29922';
-
-    let sC = 'transparent', bdr = 'none';
-    if(st === 'N') sC = diffCol; 
-    else if(st === 'D') sC = '#f85149'; 
-    else if(st === 'C') sC = diffCol; 
-    else if(st === 'P') { sC = 'transparent'; bdr = '2px solid ' + diffCol; } 
-    else if(st === 'E') { sC = 'transparent'; bdr = '1px solid #30363d'; }
-
-    const textCol = isDull ? '#8b949e' : '#c9d1d9'; const iconOp = isDull ? '0.6' : '1';
-    const bC = cust ? `<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>` : '';
-    const bE = ext ? `<span class="badge shadow-sm ms-1 text-dark" style="font-size:9px; background-color:#ff79c6;">EXT</span>` : '';
-    d.innerHTML = `<i class="fa-solid fa-caret-down toggle-icon"></i><span class="status-dot" style="background:${sC}; border:${bdr}; box-sizing: border-box;"></span><i class="fa-solid ${ic} icon-col" style="color:${col}; opacity:${iconOp};"></i><span class="node-text" style="color:${textCol};">${txt} ${bC} ${bE} ${extraHTML}</span>`;
-    return d;
+function createUiRow(i,ic,t,st,c,e,col,id,ex=""){
+    let d=document.createElement('div'); d.className='tree-row'; d.style.paddingLeft=`${i*20+10}px`; if(id)d.dataset.id=id; d.dataset.st=st; d.dataset.name=t;
+    let sC='transparent', bdr='none'; if(st==='N')sC='#3fb950';else if(st==='D')sC='#f85149';else if(st==='C')sC='#d29922';else if(st==='P')bdr='2px solid #d29922';else if(st==='E')bdr='1px solid #30363d';
+    d.innerHTML=`<i class="fa-solid fa-caret-down toggle-icon"></i><span class="status-dot" style="background:${sC};border:${bdr};"></span><i class="fa-solid ${ic} icon-col" style="color:${col};opacity:${st==='E'?'.6':'1'};"></i><span class="node-text" style="color:${st==='E'?'#8b949e':'#c9d1d9'};">${t} ${c?'<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>':''} ${e?'<span class="badge shadow-sm ms-1 text-dark" style="background-color:#ff79c6;font-size:9px">EXT</span>':''} ${ex}</span>`; return d;
 }
 
-function toggleAllTree(exp) { document.querySelectorAll('.tree-row:not(.no-children), .group-header').forEach(r => r.classList.toggle('collapsed', !exp)); }
-function activateRow(row) { document.querySelectorAll('.tree-row').forEach(r => r.classList.remove('active')); row.classList.add('active'); }
+function toggleAllTree(ex){document.querySelectorAll('.tree-row:not(.no-children), .group-header').forEach(r=>r.classList.toggle('collapsed',!ex));}
+function activateRow(r){document.querySelectorAll('.tree-row').forEach(x=>x.classList.remove('active')); r.classList.add('active');}
+function setMode(m){state.currentMode=m;S('btn-mode-core').className=m==='core'?'btn btn-secondary fw-bold':'btn btn-outline-secondary';S('btn-mode-custom').className=m==='custom'?'btn btn-custom fw-bold':'btn btn-outline-secondary'; if(!S('props-view').classList.contains('d-none')){let a=document.querySelector('.tree-row.active');if(a&&a.dataset.id){let d=window._nodeRegistry[a.dataset.id];if(d)showProps(d.o,d.m);}}else if(!S('diff-view-container').classList.contains('d-none')){if(state.diffViewInfo)setDiffMode(m);}}
 
-function setMode(mode) {
-    state.currentMode = mode;
-    S('btn-mode-core').className = mode === 'core' ? 'btn btn-secondary fw-bold' : 'btn btn-outline-secondary';
-    S('btn-mode-custom').className = mode === 'custom' ? 'btn btn-custom fw-bold' : 'btn btn-outline-secondary';
-    
-    if (!S('props-view').classList.contains('d-none')) {
-        let activeRow = document.querySelector('.tree-row.active');
-        if (activeRow && activeRow.dataset.id) {
-            let d = window._nodeRegistry[activeRow.dataset.id];
-            if (d) showProps(d.o, d.m);
-        }
-    } else if (!S('diff-view-container').classList.contains('d-none')) {
-        if (state.diffViewInfo) setDiffMode(mode);
-    }
-}
-
-// --- PROPERTIES / DETAILS ---
-function showProps(o, m) {
-    S('props-view').classList.remove('d-none'); 
-    S('diff-view-container').classList.add('d-none'); 
-    S('diff-view-container').classList.remove('d-flex'); 
-    S('diff-toolbar').classList.add('d-none'); 
-    S('debug-banner').classList.add('d-none');
-
-    let act = m || o; let conf = UI_CONFIG[act.type] || { i: 'fa-cube', c: '#8b949e' };
-    if(act.isExt) conf = UI_CONFIG.ExtensionPoint;
-    let isTpl = state.compareMode === 'template';
-    
-    let hasMods = m && (m.customProps.size > 0 || m.customProcs.size > 0 || m.isCustom);
-    if(hasMods && !isTpl) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
-
-    let b = (act.isCustom && !isTpl) ? `<span class="badge badge-custom ms-2">CUSTOM</span>` : '';
-    S('view-title').innerHTML = `<i class="fa-solid ${conf.i} me-2" style="color:${conf.c}"></i> ${act.name} ${b}`;
-
-    if(act.type === 'neonView') { renderViews(o, m); return; }
-
-    const buildTable = (data, comp, isMod, realO, realM, specType) => {
-        let type = specType || act.type;
-        const dict = PROP_DICTIONARY[type] || { groups: {}, defaults: {} }; const defs = dict.defaults || {};
-        let allDictProps = []; for(let g in dict.groups) allDictProps.push(...dict.groups[g]);
-        let extraProps = new Set([...Object.keys(data), ...Object.keys(comp)]); allDictProps.forEach(p => extraProps.delete(p));
-        
-        let h = "";
-        let rId = registerNodePair(realO, realM);
-
-        const renderRow = (p) => {
-            let v = data[p], cv = comp[p]; if(v===undefined && cv===undefined) v = defs[p];
-            let isSet = data[p] !== undefined; 
-            let propColor = isSet ? '#e6edf3' : '#6e7681'; let propWeight = isSet ? '600' : 'normal'; let valColor = isSet ? '#c9d1d9' : '#6e7681';
-            let valH = v !== undefined ? escapeHtml(v) : ``;
-            let diff = v !== cv && (data[p]!==undefined || comp[p]!==undefined);
-            
-            let isProc = ADITO_PROCESS_NAMES.has(p);
-            let trAttrs = "";
-            let rowHover = "prop-row";
-
-            if (isProc && isSet) {
-                let oC = realO?.procContents?.[p]; 
-                let mC = undefined;
-                if (realM) {
-                    mC = (state.currentMode === 'core' && realM.coreProcContents.hasOwnProperty(p)) ? realM.coreProcContents[p] : realM.procContents[p];
-                }
-
-                let badgeTxt = 'Identisch', badgeCol = '#8b949e', icon = 'fa-check';
-                if (oC && !mC) { badgeTxt = 'Entfernt'; badgeCol = '#f85149'; icon = 'fa-minus'; }
-                else if (!oC && mC) { badgeTxt = 'Neu'; badgeCol = isTpl ? '#f85149' : '#3fb950'; icon = 'fa-plus'; }
-                else if (normalizeStr(oC) !== normalizeStr(mC)) { badgeTxt = 'Geändert'; badgeCol = isTpl ? '#f85149' : '#d29922'; icon = 'fa-pen'; }
-                
-                valH = `<span class="badge" style="border: 1px solid ${badgeCol}; color: ${badgeCol}; background: transparent;"><i class="fa-solid ${icon}"></i> ${badgeTxt}</span>`;
-                rowHover = "prop-row-interactive";
-                trAttrs = `onclick="window.triggerDiffFromProp('${rId}', '${p}')" title="Klicken für Code-Diff"`;
-                valColor = badgeCol;
-            }
-
-            let isCustomDiff = isMod && realM?.customProps.has(p) && state.currentMode === 'custom' && !isTpl;
-            let bClass = diff && !isProc ? (isTpl ? "subtle-diff-border-template" : (isCustomDiff ? "subtle-diff-border-custom" : "subtle-diff-border")) : "";
-            let tClass = diff && !isProc ? (isTpl ? 'text-template fw-bold' : (isCustomDiff ? 'text-custom fw-bold' : 'text-warning fw-bold')) : '';
-
-            return `<tr class="${rowHover}" ${trAttrs}><td class="${bClass}" style="width:35%; border-color:#30363d; transition: background 0.1s;"><span style="color:${propColor}; font-weight:${propWeight};">${p}</span></td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${diff && !isProc?'':valColor}; transition: background 0.1s;">${valH}</td></tr>`;
+function showProps(o, m){
+    S('props-view').classList.remove('d-none'); S('diff-view-container').classList.add('d-none'); S('diff-view-container').classList.remove('d-flex'); S('diff-toolbar').classList.add('d-none'); S('debug-banner').classList.add('d-none');
+    let act=m||o, isT=state.compareMode==='template', cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'}, hasM=m&&(m.customProps.size>0||m.customProcs.size>0)&&!m.isCustom;
+    S('mode-toggle').classList.toggle('d-none',!(hasM&&!isT)); S('view-title').innerHTML=`<i class="fa-solid ${cnf.i} me-2" style="color:${cnf.c}"></i> ${act.name} ${(act.isCustom&&!isT)?'<span class="badge badge-custom ms-2">CUSTOM</span>':''}`;
+    if(act.type==='neonView'){renderViews(o,m);return;}
+    const bT=(d,c,isM,rO,rM,t)=>{
+        let pt=PROP_DICTIONARY[t]||{groups:{},defaults:{}}, dfs=pt.defaults, rId=registerNodePair(rO,rM), eS=new Set([...Object.keys(d),...Object.keys(c)]); Object.values(pt.groups).flat().forEach(p=>eS.delete(p));
+        const rR=p=>{
+            let v=d[p],cv=c[p]; if(v===undefined&&cv===undefined)v=dfs[p]; let isS=d[p]!==undefined, dif=v!==cv&&(d[p]!==undefined||c[p]!==undefined), isP=ADITO_PROCESS_NAMES.has(p), vH=v!==undefined?esc(v):"";
+            let tA="", rH="prop-row", vC=isS?'#c9d1d9':'#6e7681';
+            if(isP&&isS){ let oC=rO?.procContents?.[p], mC=rM?((state.currentMode==='core'&&rM.coreProcContents.hasOwnProperty(p))?rM.coreProcContents[p]:rM.procContents[p]):undefined, bT='Identisch', bC='#8b949e', ic='fa-check'; if(oC&&!mC){bT='Entfernt';bC='#f85149';ic='fa-minus';}else if(!oC&&mC){bT='Neu';bC='#3fb950';ic='fa-plus';}else if(normS(oC)!==normS(mC)){bT='Geändert';bC='#d29922';ic='fa-pen';} vH=`<span class="badge" style="border:1px solid ${bC};color:${bC};"><i class="fa-solid ${ic}"></i> ${bT}</span>`; rH="prop-row-interactive"; tA=`onclick="window.triggerDiffFromProp('${rId}', '${p}')"`; vC=bC; }
+            let isCD=isM&&rM?.customProps.has(p)&&state.currentMode==='custom'&&!isT, bCl=dif&&!isP?(isCD?"subtle-diff-border-custom":"subtle-diff-border"):"", tCl=dif&&!isP?(isCD?'text-custom fw-bold':'text-warning fw-bold'):'';
+            return `<tr class="${rH}" ${tA}><td class="${bCl}" style="width:35%;border-color:#30363d;"><span style="color:${isS?'#e6edf3':'#6e7681'};font-weight:${isS?'600':'normal'};">${p}</span></td><td class="font-monospace text-break ${tCl}" style="border-color:#30363d;color:${dif&&!isP?'':vC};">${vH}</td></tr>`;
         };
-
-        for(const [gName, pList] of Object.entries(dict.groups || {})) {
-            let rows = pList.map(p => renderRow(p)).join(''); h += `<div class="prop-box"><div class="prop-box-header">${gName}</div><table class="table table-sm m-0" style="color:#c9d1d9; background:transparent;"><tbody>${rows}</tbody></table></div>`;
-        }
-        if(extraProps.size > 0) {
-            let rows = [...extraProps].sort().map(p => renderRow(p)).join(''); h += `<div class="prop-box"><div class="prop-box-header">Extras</div><table class="table table-sm m-0" style="color:#c9d1d9; background:transparent;"><tbody>${rows}</tbody></table></div>`;
-        }
-        return h || `<div class="text-secondary p-3">Keine Properties definiert.</div>`;
+        let h=""; for(const [g,pL] of Object.entries(pt.groups)){ h+=`<div class="prop-box"><div class="prop-box-header">${g}</div><table class="table table-sm m-0 bg-transparent"><tbody>${pL.map(rR).join('')}</tbody></table></div>`; }
+        if(eS.size>0) h+=`<div class="prop-box"><div class="prop-box-header">Extras</div><table class="table table-sm m-0 bg-transparent"><tbody>${[...eS].sort().map(rR).join('')}</tbody></table></div>`; return h||`<div class="text-secondary p-3">Keine Properties.</div>`;
     };
-
-    let isOrigMissing = !o;
-    let isModMissing = !m || m.isDeleted;
-    
-    let mPropsToUse = m ? (state.currentMode === 'core' && Object.keys(m.coreProps || {}).length > 0 ? m.coreProps : m.props) : {};
-
-    let fH1 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">${isTpl ? 'Template Base' : 'Original Base'}</h6>`;
-    let fH2 = `<h6 style="color:#8b949e; text-transform:uppercase; font-size:11px; margin-bottom:10px;">${isTpl ? 'Source Target' : 'Modular Target'} ${state.currentMode === 'core' && hasMods && !isTpl ? '(Core)' : ''}</h6>`;
-
-    if (isOrigMissing && !isModMissing) {
-        fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Element existiert in Base nicht (Neu in Target).</div>`;
-        fH2 += buildTable(mPropsToUse, mPropsToUse, true, o, m, act.type);
-    } else if (!isOrigMissing && isModMissing) {
-        fH1 += buildTable(o.props, o.props, false, o, m, act.type);
-        fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Element existiert in Target nicht mehr (Gelöscht).</div>`;
-    } else {
-        fH1 += buildTable(o.props, mPropsToUse, false, o, m, act.type);
-        fH2 += buildTable(mPropsToUse, o.props, true, o, m, act.type);
-    }
-
-    if (act.type === 'entity') {
-        let leftData = isTpl ? state.templateData : state.origData;
-        let rightData = isTpl ? state.origData : state.modData;
-        let cO = leftData.context, cM = rightData.context;
-        let cMProps = cM ? (state.currentMode === 'core' && Object.keys(cM.coreProps || {}).length > 0 ? cM.coreProps : cM.props) : {};
-
-        if (cO || cM) {
-            fH1 += `<div class="mt-4"><h6 style="color:#f78166; text-transform:uppercase; font-size:11px; margin-bottom:10px;"><i class="fa-solid fa-sitemap"></i> Context Info</h6>`;
-            fH2 += `<div class="mt-4"><h6 style="color:#f78166; text-transform:uppercase; font-size:11px; margin-bottom:10px;"><i class="fa-solid fa-sitemap"></i> Context Info</h6>`;
-            
-            let isCtxOrigMissing = !cO;
-            let isCtxModMissing = !cM || cM.isDeleted;
-
-            if (isCtxOrigMissing && !isCtxModMissing) {
-                fH1 += `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> Kontext existiert in Base nicht (Neu).</div></div>`;
-                fH2 += buildTable(cMProps, cMProps, true, cO, cM, 'neonContext') + `</div>`;
-            } else if (!isCtxOrigMissing && isCtxModMissing) {
-                fH1 += buildTable(cO.props, cO.props, false, cO, cM, 'neonContext') + `</div>`;
-                fH2 += `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> Kontext existiert in Target nicht mehr.</div></div>`;
-            } else {
-                fH1 += buildTable(cO.props, cMProps, false, cO, cM, 'neonContext') + `</div>`;
-                fH2 += buildTable(cMProps, cO.props, true, cO, cM, 'neonContext') + `</div>`;
-            }
-        }
-    }
-
-    S('pane1').innerHTML = fH1;
-    S('pane2').innerHTML = fH2;
+    let mP=m?(state.currentMode==='core'&&Object.keys(m.coreProps||{}).length>0?m.coreProps:m.props):{}, lN=isT?(window.projNameTpl||'Template Base'):(window.projNameOrig||'Original Base'), rN=isT?(window.projNameOrig||'Original Base'):(window.projNameMod||'Modular Target');
+    let f1=`<h6 style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">${lN}</h6>`, f2=`<h6 style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">${rN} ${state.currentMode==='core'&&hasM&&!isT?'(Core)':''}</h6>`;
+    if(!o&&(!m||m.isDeleted)){f1+=bT(mP,mP,true,o,m,act.type);} else if(!o){f1+=`<div class="alert alert-info bg-dark m-2 border-info"><i class="fa-solid fa-plus-circle"></i> Neu in Target.</div>`;f2+=bT(mP,mP,true,o,m,act.type);} else if(!m||m.isDeleted){f1+=bT(o.props,o.props,false,o,m,act.type);f2+=`<div class="alert alert-danger bg-dark m-2 border-danger"><i class="fa-solid fa-minus-circle"></i> Gelöscht.</div>`;} else {f1+=bT(o.props,mP,false,o,m,act.type);f2+=bT(mP,o.props,true,o,m,act.type);}
+    S('pane1').innerHTML=f1; S('pane2').innerHTML=f2;
 }
 
-const p1 = S('pane1'), p2 = S('pane2'); let isSyncP1 = false, isSyncP2 = false;
-p1.onscroll = () => { if(!isSyncP1) { isSyncP2 = true; p2.scrollTop = p1.scrollTop; } isSyncP1 = false; };
-p2.onscroll = () => { if(!isSyncP2) { isSyncP1 = true; p1.scrollTop = p2.scrollTop; } isSyncP2 = false; };
+let isSP1=false, isSP2=false; S('pane1').onscroll=()=>{if(!isSP1){isSP2=true;S('pane2').scrollTop=S('pane1').scrollTop;}isSP1=false;}; S('pane2').onscroll=()=>{if(!isSP2){isSP1=true;S('pane1').scrollTop=S('pane2').scrollTop;}isSP2=false;};
+function copyViewXml(s){navigator.clipboard.writeText(state.currentViewXml[s]||"");}
+function toggleAllTemplates(e){document.querySelectorAll('.view-tpl-table').forEach(t=>t.classList.toggle('d-none',!e)); document.querySelectorAll('.tpl-chevron').forEach(i=>i.classList.toggle('collapsed',!e));}
+function toggleTemplate(id,cId){S(id).classList.toggle('d-none');S(cId).classList.toggle('collapsed');}
 
-function copyViewXml(side) { let xml = state.currentViewXml[side]; if(xml) navigator.clipboard.writeText(xml); }
-function toggleAllTemplates(expand) {
-    document.querySelectorAll('.view-tpl-table').forEach(tbl => { if(expand) tbl.classList.remove('d-none'); else tbl.classList.add('d-none'); });
-    document.querySelectorAll('.tpl-chevron').forEach(i => { if(expand) i.classList.remove('collapsed'); else i.classList.add('collapsed'); });
-}
-function toggleTemplate(id, chevronId) { S(id).classList.toggle('d-none'); S(chevronId).classList.toggle('collapsed'); }
-
-function generateTplTable(tpl, compTpl, isMod, actIsCustom) {
-    let props = tpl.props; let compProps = compTpl ? compTpl.props : {};
-    let allProps = new Set([...Object.keys(props), ...Object.keys(compProps)]);
-    let tProps = "";
-    let isTpl = state.compareMode === 'template';
-
-    [...allProps].sort().forEach(p => {
-        let v = props[p]; let cv = compProps[p];
-        if(v === undefined && isMod) return; 
-        let isDiff = v !== cv && (v!==undefined && cv!==undefined);
-        let bClass = isDiff ? (isTpl ? "subtle-diff-border-template" : (isMod && actIsCustom ? "subtle-diff-border-custom" : "subtle-diff-border")) : "";
-        let tClass = isDiff ? (isTpl ? 'text-template fw-bold' : (isMod && actIsCustom ? 'text-custom fw-bold' : 'text-warning fw-bold')) : '';
-        let valH = v !== undefined ? escapeHtml(v) : ``;
-        let valColor = (v === undefined) ? '#6e7681' : (isDiff ? '' : '#c9d1d9');
-        tProps += `<tr><td class="${bClass}" style="width:30%; border-color:#30363d; color:#8b949e;">${p}</td><td class="font-monospace text-break ${tClass}" style="border-color:#30363d; color:${valColor};">${valH}</td></tr>`;
-    });
-    return tProps;
-}
-
-function renderViews(o, m) {
-    state.currentViewXml = { 1: o?.rawXml?.outerHTML || "", 2: m?.rawXml?.outerHTML || "" };
-    let act = m || o; 
-    let isTpl = state.compareMode === 'template';
-    let activeProjLeft = isTpl ? projTemplate : projOrig;
-    let activeProjRight = isTpl ? projOrig : projMod;
-
-    let refs = new Set([...getRefsCI(activeProjLeft?.viewRefs, act.name), ...getRefsCI(activeProjRight?.viewRefs, act.name)]);
-    
-    let refStr = `<div class="prop-box mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">`;
-    if(refs.size > 0) { refStr += [...refs].sort().map(c => `<span class="badge ${c.startsWith('Context:') ? 'bg-primary' : 'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''); } 
-    else { refStr += `<span class="text-muted small">Keine bekannten Referenzen in diesem Projekt.</span>`; }
-    refStr += `</div></div>`;
-
-    let oTpls = extractTemplates(o?.rawXml); let mTpls = extractTemplates(m?.rawXml);
-
-    const buildSide = (tplsMap, compTplsMap, side, isMod, actIsCustom, orderedNames) => {
-        let h = `<div class="list-group list-group-flush rounded-1 border" style="border-color: #30363d !important;">`;
-        if(orderedNames.length === 0) return h + `<div class="p-3 text-muted small">Keine Templates</div></div>`;
-        
-        orderedNames.forEach(tName => {
-            let tpl = getTplCI(tplsMap.items, tName); let compTpl = getTplCI(compTplsMap.items, tName);
-            let hash = Math.random().toString(36).substr(2, 9); let collapseId = 'tpl_' + side + '_' + hash; let chevronId = 'chev_' + side + '_' + hash;
-
-            if(!tpl) { h += `<div class="list-group-item p-2" style="background:#161b22; border-color:#30363d; opacity:0.5;"><div class="text-danger fw-bold"><i class="fa-solid fa-minus"></i> Fehlt (in dieser Version)</div></div>`; return; }
-            
-            let type = tpl.type; 
-            let isRef = (type === 'neonViewReference');
-            let icon = isRef ? 'fa-link' : 'fa-layer-group';
-            
-            let titleCol = '#58a6ff'; 
-            let refBadge = "";
-            let itemStyle = "background:#161b22; border-color:#30363d;";
-            
-            if(isRef) {
-                titleCol = '#8b949e'; 
-                let entName = S('entitySelect').value.toLowerCase();
-                let isInternal = activeProjRight?.contextViews.get(entName)?.has(tpl.originalName) || activeProjLeft?.contextViews.get(entName)?.has(tpl.originalName);
-                
-                if (isInternal) {
-                    refBadge = `<span class="badge bg-dark border border-secondary text-secondary ms-2 fw-normal" style="font-size:9px;">Interne Referenz</span>`;
-                } else {
-                    refBadge = `<span class="badge bg-dark border border-warning text-warning ms-2 fw-normal" style="font-size:9px;">Externe Referenz</span>`;
-                }
-                itemStyle = "background:#0d1117; border-color:#30363d;"; 
-            } else {
-                refBadge = ""; 
-            }
-
-            let isDiff = false; if(!compTpl) isDiff = true; else if(JSON.stringify(tpl.props) !== JSON.stringify(compTpl.props)) isDiff = true;
-            if(isDiff) {
-                titleCol = isTpl ? '#f85149' : (isMod && actIsCustom ? '#d2a8ff' : '#d29922');
-            }
-            
-            let tProps = generateTplTable(tpl, compTpl, isMod, actIsCustom);
-            
-            h += `<div class="list-group-item p-0 view-tpl-header" style="${itemStyle}">
-                    <div class="p-2 d-flex align-items-center" onclick="toggleTemplate('${collapseId}', '${chevronId}')">
-                        <i id="${chevronId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i>
-                        <div><div class="fw-bold" style="color:${titleCol}"><i class="fa-solid ${icon} me-1"></i> ${tName} ${refBadge}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${type}</div></div>
-                    </div><table id="${collapseId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px; background:#0d1117;"><tbody>${tProps}</tbody></table>
-                  </div>`;
-        });
-        return h + '</div>';
+function renderViews(o,m){
+    state.currentViewXml={1:o?.rawXml?.outerHTML||"",2:m?.rawXml?.outerHTML||""}; let act=m||o, isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, rs=new Set([...getRefsCI(pL?.viewRefs,act.name),...getRefsCI(pR?.viewRefs,act.name)]);
+    let rS=`<div class="prop-box mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">${rs.size?[...rs].sort().map(c=>`<span class="badge ${c.startsWith('Context:')?'bg-primary':'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''):'<span class="text-muted small">Keine Referenzen.</span>'}</div></div>`;
+    let oT=extractTemplates(o?.rawXml), mT=extractTemplates(m?.rawXml), oNm=[...new Set([...oT.order,...mT.order])];
+    const bS=(tM,cM,s,isM,isC,nL)=>{
+        let h=`<div class="list-group list-group-flush rounded-1 border" style="border-color:#30363d!important;">`; if(!nL.length)return h+`<div class="p-3 text-muted small">Keine Templates</div></div>`;
+        nL.forEach(tn=>{
+            let tl=getTplCI(tM.items,tn), ct=getTplCI(cM.items,tn), hid=Math.random().toString(36).substr(2,9), cId='tpl_'+s+'_'+hid, chId='chev_'+s+'_'+hid;
+            if(!tl){h+=`<div class="list-group-item p-2" style="background:#161b22;border-color:#30363d;opacity:.5;"><div class="text-danger fw-bold"><i class="fa-solid fa-minus"></i> Fehlt</div></div>`;return;}
+            let isR=tl.type==='neonViewReference', rb="", ic=isR?'fa-link':'fa-layer-group', tC=isR?'#8b949e':'#58a6ff', dif=!ct||JSON.stringify(tl.props)!==JSON.stringify(ct.props);
+            if(isR) rb=(pR?.contextViews.get(S('entitySelect').value.toLowerCase())?.has(tl.originalName)||pL?.contextViews.get(S('entitySelect').value.toLowerCase())?.has(tl.originalName))?`<span class="badge bg-dark border border-secondary text-secondary ms-2 fw-normal" style="font-size:9px;">Interne Referenz</span>`:`<span class="badge bg-dark border border-warning text-warning ms-2 fw-normal" style="font-size:9px;">Externe Referenz</span>`;
+            if(dif) tC=(isM&&isC?'#d2a8ff':'#d29922'); let tP=""; [...new Set([...Object.keys(tl.props),...Object.keys(ct?.props||{})])].sort().forEach(p=>{let v=tl.props[p],cv=ct?.props?.[p]; if(v===undefined&&isM)return; let d=v!==cv&&(v!==undefined&&cv!==undefined); tP+=`<tr><td class="${d?(isM&&isC?'subtle-diff-border-custom':'subtle-diff-border'):''}" style="width:30%;border-color:#30363d;color:#8b949e;">${p}</td><td class="font-monospace text-break ${d?(isM&&isC?'text-custom fw-bold':'text-warning fw-bold'):''}" style="border-color:#30363d;color:${v===undefined?'#6e7681':(d?'':'#c9d1d9')};">${v!==undefined?esc(v):''}</td></tr>`;});
+            h+=`<div class="list-group-item p-0 view-tpl-header" style="background:${isR?'#0d1117':'#161b22'};border-color:#30363d;"><div class="p-2 d-flex align-items-center" onclick="toggleTemplate('${cId}','${chId}')"><i id="${chId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i><div><div class="fw-bold" style="color:${tC}"><i class="fa-solid ${ic} me-1"></i> ${tn} ${rb}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${tl.type}</div></div></div><table id="${cId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px;background:#0d1117;"><tbody>${tP}</tbody></table></div>`;
+        }); return h+'</div>';
     };
+    let cb=`<div class="mb-2"><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false)"><i class="fa-solid fa-compress"></i> Alle</button></div>`, lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=isT?(window.projNameOrig||'Original'):(window.projNameMod||'Modular'), oC="", mC="";
+    if(!o&&(!m||m.isDeleted)){oC=mC=bS(mT,mT,2,true,act.isCustom,oNm);} else if(!o){oC=`<div class="alert alert-info bg-dark m-2 border-info"><i class="fa-solid fa-plus-circle"></i> Neu.</div>`;mC=bS(mT,mT,2,true,act.isCustom,oNm);}else if(!m||m.isDeleted){oC=bS(oT,oT,1,false,false,oNm);mC=`<div class="alert alert-danger bg-dark m-2 border-danger"><i class="fa-solid fa-minus-circle"></i> Gelöscht.</div>`;}else{oC=bS(oT,mT,1,false,false,oNm);mC=bS(mT,oT,2,true,act.isCustom,oNm);}
+    S('pane1').innerHTML=rS+`<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${lN}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> XML</button></div>`+cb+oC; S('pane2').innerHTML=rS+`<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${rN}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> XML</button></div>`+cb+mC;
+}
 
-    let mergedOrder = mergeTemplateOrders(oTpls.order, mTpls.order);
-    let ctrlBar = `<div class="mb-2"><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
+function toggleDebugBanner(){S('debug-banner').classList.toggle('d-none');}
+function copyPath(s){let p=S('debug-path-'+s).textContent; if(p&&p!=='...')navigator.clipboard.writeText(p);}
+
+async function loadDiff(pN, pO, pM, tN, oN){
+    S('props-view').classList.add('d-none'); S('diff-view-container').classList.remove('d-none'); S('diff-view-container').classList.add('d-flex'); S('diff-toolbar').classList.remove('d-none'); S('diff-toolbar').classList.add('d-flex');
+    let isT=state.compareMode==='template'; S('view-title').innerHTML=`<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pN}`; S('diff-html-target').innerHTML='<div class="p-5 text-center text-primary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i></div>';
+    let cO=oN?.procContents[pN]||"", cM=tN?.procContents[pN]||"", cS=tN?.coreProcContents[pN]||cM, isC=tN?.customProcs.has(pN)||false;
+    S('debug-path-orig').textContent=pO||"Nicht vorhanden"; state.diffViewInfo={origCode:cO,modCode:cM,sourceCode:cS,name:pN,pOrig:pO,pMod:pM,isCustomMod:isC,targetNode:tN};
+    S('mode-toggle').classList.toggle('d-none',!(isC&&!isT)); setMode((isC&&!isT)?'custom':'core');
+}
+
+async function reloadCurrentProcess(){
+    if(state.diffViewInfo){ let isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, {name:n,pOrig:pO,pMod:pM,targetNode:tN}=state.diffViewInfo;
+        if(pO){let f=pL.findFile(pO); if(f)state.diffViewInfo.origCode=await pL.readText(f.fullPath);}
+        if(pM){let f=pR.findFile(pM); if(f){state.diffViewInfo.modCode=await pR.readText(f.fullPath); tN.procContents[n]=state.diffViewInfo.modCode;}} setDiffMode(state.currentMode);
+    }
+}
+
+async function setDiffMode(m){
+    if(!state.diffViewInfo)return; let isT=state.compareMode==='template', lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=(isT?(window.projNameOrig||'Source'):(window.projNameMod||'Modular'))+(isT?"":(m==="custom"?" (Custom)":" (Core)"));
+    let c1=state.diffViewInfo.origCode, c2=(m==='custom'&&!isT)?state.diffViewInfo.modCode:(isT?state.diffViewInfo.modCode:state.diffViewInfo.sourceCode);
+    S('debug-path-mod').textContent=((m==='custom'&&!isT)?state.diffViewInfo.pMod:(state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name]||state.diffViewInfo.pMod))||"Nicht vorhanden";
+    if(!c1&&c2){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-plus-circle"></i> Neu in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c2)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
+    if(c1&&!c2){S('diff-html-target').innerHTML=`<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger"><i class="fa-solid fa-minus-circle"></i> Entfernt in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
+    if(normS(c1)===normS(c2)&&c1!==""){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-check-circle"></i> Code ist identisch.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     
-    let isOrigMissing = !o;
-    let isModMissing = !m || m.isDeleted;
-
-    let origContent = "";
-    let modContent = "";
-
-    if (isOrigMissing && !isModMissing) {
-        origContent = `<div class="alert alert-info m-2 bg-dark text-info border-info d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> View existiert in Base nicht (Neu).</div>`;
-        modContent = buildSide(mTpls, mTpls, 2, true, act.isCustom, mergedOrder);
-    } else if (!isOrigMissing && isModMissing) {
-        origContent = buildSide(oTpls, oTpls, 1, false, false, mergedOrder);
-        modContent = `<div class="alert alert-danger m-2 bg-dark text-danger border-danger d-flex align-items-center gap-2" style="font-size: 12px; background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> View existiert in Target nicht mehr (Gelöscht).</div>`;
+    if(S('rawDiffToggle')?.checked){
+        const bRP=(t,c,iL)=>`<div class="d-flex flex-column ${iL?'border-end border-secondary':''}" style="flex:1 1 50%; min-width:0; min-height:0;"><div class="bg-dark p-2 text-secondary fw-bold border-bottom flex-shrink-0" style="font-size:11px;">${t}</div><div class="bg-dark flex-grow-1 overflow-auto raw-diff-pane" style="min-height:0;"><div class="d-flex"><div class="text-secondary text-end border-end user-select-none opacity-50" style="padding:1rem .5rem; min-width:45px; font-size:14px; font-family:var(--bs-font-monospace); line-height:1.5; background:#0d1117; position:sticky; left:0; z-index:5;">${Array((c||"").split('\n').length).fill().map((_,i)=>i+1).join('\n')}</div><div style="padding:1rem; width:max-content; min-width:calc(100% - 45px);"><pre class="m-0" style="font-size:14px; line-height:1.5;"><code class="language-javascript bg-transparent p-0">${esc(c)}</code></pre></div></div></div></div>`;
+        S('diff-html-target').innerHTML=`<div class="d-flex flex-row flex-grow-1 w-100" style="min-height:0; overflow:hidden;">${bRP(lN,c1,true)}${bRP(rN,c2,false)}</div>`;
+        S('diff-html-target').querySelectorAll('code').forEach(hljs.highlightElement);
     } else {
-        origContent = buildSide(oTpls, mTpls, 1, false, false, mergedOrder);
-        modContent = buildSide(mTpls, oTpls, 2, true, act.isCustom, mergedOrder);
+        S('diff-html-target').innerHTML=''; new Diff2HtmlUI(S('diff-html-target'), Diff.createTwoFilesPatch(lN,rN,c1||"",c2||"","","",{context:99999}), {drawFileList:false,matching:'words',outputFormat:'side-by-side',colorScheme:'dark'}, hljs).draw();
     }
-
-    let leftTitle = isTpl ? "Template Templates & Refs" : "Original Templates & Refs";
-    let rightTitle = isTpl ? "Source Templates & Refs" : "Modular Templates & Refs";
-
-    S('pane1').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${leftTitle}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + origContent;
-    S('pane2').innerHTML = refStr + `<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${rightTitle}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> Copy XML</button></div>` + ctrlBar + modContent;
-}
-
-// --- DIFF VIEW ---
-function toggleDebugBanner() { S('debug-banner').classList.toggle('d-none'); }
-function copyPath(side) { let p = S('debug-path-'+side).textContent; if(p && p!=='...') navigator.clipboard.writeText(p); }
-
-async function loadDiff(pName, pOrig, pMod, targetNode, origNode) {
-    S('props-view').classList.add('d-none'); 
-    S('diff-view-container').classList.remove('d-none'); 
-    S('diff-view-container').classList.add('d-flex'); 
-    S('diff-toolbar').classList.remove('d-none'); 
-    S('diff-toolbar').classList.add('d-flex');
-    
-    let isTpl = state.compareMode === 'template';
-    
-    S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pName}`;
-    S('diff-html-target').innerHTML = '<div class="p-5 text-center" style="color:#58a6ff"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i><br>Lade Code...</div>';
-
-    let cOrig = origNode?.procContents[pName] || ""; let cMod = targetNode?.procContents[pName] || ""; let cSource = targetNode?.coreProcContents[pName] || cMod; 
-    S('debug-path-orig').textContent = pOrig || "Nicht vorhanden";
-    
-    let isCustomMod = targetNode?.customProcs.has(pName) || false;
-    state.diffViewInfo = { origCode: cOrig, modCode: cMod, sourceCode: cSource, name: pName, pOrig: pOrig, pMod: pMod, isCustomMod: isCustomMod, targetNode: targetNode };
-    
-    if(isCustomMod && !isTpl) S('mode-toggle').classList.remove('d-none'); else S('mode-toggle').classList.add('d-none');
-    setMode((isCustomMod && !isTpl) ? 'custom' : 'core');
-}
-
-async function reloadCurrentProcess() {
-    if(state.diffViewInfo) {
-        let isTpl = state.compareMode === 'template';
-        let activeProjLeft = isTpl ? projTemplate : projOrig;
-        let activeProjRight = isTpl ? projOrig : projMod;
-        let { name, pOrig, pMod, targetNode } = state.diffViewInfo;
-        
-        if(pOrig) { let f = activeProjLeft.findFile(pOrig); if(f) state.diffViewInfo.origCode = await activeProjLeft.readText(f.fullPath); }
-        if(pMod) { let f = activeProjRight.findFile(pMod); if(f) { state.diffViewInfo.modCode = await activeProjRight.readText(f.fullPath); targetNode.procContents[name] = state.diffViewInfo.modCode; } }
-        setDiffMode(state.currentMode);
-    }
-}
-
-async function setDiffMode(mode) {
-    if(!state.diffViewInfo) return;
-
-    let isTpl = state.compareMode === 'template';
-    let rightName = isTpl ? "Source Target" : (mode==="custom" ? "Modular Target (Custom)" : "Modular Target (Core)");
-    let leftName = isTpl ? "Template Base" : "Original Base";
-
-    let c1 = state.diffViewInfo.origCode; let c2 = (mode === 'custom' && !isTpl) ? state.diffViewInfo.modCode : (isTpl ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode);
-    let activeModPath = (mode === 'custom' && !isTpl) ? state.diffViewInfo.pMod : (state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name] || state.diffViewInfo.pMod);
-    S('debug-path-mod').textContent = activeModPath || "Nicht vorhanden";
-
-    let isRawMode = S('rawDiffToggle') && S('rawDiffToggle').checked;
-
-    if (!c1 && c2) {
-        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-plus-circle"></i> <strong>Neu in Target.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c2)}</code></pre></div>`;
-        hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
-    } else if (c1 && !c2) {
-        S('diff-html-target').innerHTML = `<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-minus-circle"></i> <strong>Entfernt in Target.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
-        hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
-    }
-
-    if (normalizeStr(c1) === normalizeStr(c2) && c1 !== "") {
-        S('diff-html-target').innerHTML = `<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success d-flex align-items-center gap-2 shadow-sm" style="background:#161b22 !important;"><i class="fa-solid fa-check-circle"></i> <strong>Code ist identisch.</strong></div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript" style="background: transparent;">${escapeHtml(c1)}</code></pre></div>`;
-        hljs.highlightElement(S('diff-html-target').querySelector('code')); return;
-    }
-    
-    if (isRawMode) {
-        const buildRawPane = (title, code, isLeft) => {
-            let linesCount = (code || "").split('\n').length;
-            let lineNums = '';
-            for(let i=1; i<=linesCount; i++) lineNums += i + '\n';
-            let borderClass = isLeft ? 'border-end border-secondary' : '';
-            
-            return `
-            <div class="d-flex flex-column ${borderClass}" style="flex: 1 1 50%; min-width: 0;">
-                <div class="bg-dark p-2 text-secondary fw-bold border-bottom border-secondary" style="font-size:11px;">${title}</div>
-                <div class="bg-dark flex-grow-1 overflow-auto raw-diff-pane d-flex align-items-start" style="min-height:0; position:relative;">
-                    <div class="text-secondary user-select-none text-end border-end border-secondary" style="padding: 1rem 0.5rem; min-width: 45px; font-size: 14px; font-family: var(--bs-font-monospace); line-height: 1.5; background: #0d1117; position: sticky; left: 0; z-index: 5; white-space: pre; opacity: 0.6;">${lineNums}</div>
-                    <div style="padding: 1rem; width: max-content; min-width: calc(100% - 45px);">
-                        <pre class="m-0" style="font-size: 14px; line-height: 1.5;"><code class="language-javascript" style="background: transparent; padding: 0;">${escapeHtml(code)}</code></pre>
-                    </div>
-                </div>
-            </div>`;
-        };
-
-        S('diff-html-target').innerHTML = `
-            <div class="d-flex flex-row flex-grow-1 overflow-hidden w-100 h-100">
-                ${buildRawPane(leftName, c1, true)}
-                ${buildRawPane(rightName, c2, false)}
-            </div>
-        `;
-        hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[0]);
-        hljs.highlightElement(S('diff-html-target').querySelectorAll('code')[1]);
-    } else {
-        const ds = Diff.createTwoFilesPatch(leftName, rightName, c1||"", c2||"", "", "", { context: 99999 });
-        S('diff-html-target').innerHTML = '';
-        const ui = new Diff2HtmlUI(S('diff-html-target'), ds, { drawFileList: false, matching: 'words', outputFormat: 'side-by-side', colorScheme: 'dark' }, hljs);
-        ui.draw(); ui.highlightCode();
-    }
-
-    setTimeout(() => {
-        const sides = document.querySelectorAll('.d2h-file-side-diff, .raw-diff-pane');
-        if (sides.length === 2) {
-            let isSyncingLeft = false, isSyncingRight = false;
-            sides[0].addEventListener('scroll', () => {
-                if (!isSyncingLeft) { isSyncingRight = true; sides[1].scrollTop = sides[0].scrollTop; }
-                isSyncingLeft = false;
-            });
-            sides[1].addEventListener('scroll', () => {
-                if (!isSyncingRight) { isSyncingLeft = true; sides[0].scrollTop = sides[1].scrollTop; }
-                isSyncingRight = false;
-            });
+    setTimeout(()=>{
+        const s=document.querySelectorAll('.d2h-file-side-diff, .raw-diff-pane');
+        if(s.length===2){ let sL=false, sR=false;
+            s[0].addEventListener('scroll',()=>{if(!sL){sR=true;s[1].scrollTop=s[0].scrollTop;s[1].scrollLeft=s[0].scrollLeft;}sL=false;});
+            s[1].addEventListener('scroll',()=>{if(!sR){sL=true;s[0].scrollTop=s[1].scrollTop;s[0].scrollLeft=s[1].scrollLeft;}sR=false;});
         }
-    }, 50);
+    },50);
 }
 
-function copySource(id) { 
-    if(state.diffViewInfo) {
-        let isTpl = state.compareMode === 'template';
-        let mode = S('btn-mode-custom').classList.contains('btn-custom') ? 'custom' : 'core';
-        let code = id === 1 ? state.diffViewInfo.origCode : ((mode === 'custom' && !isTpl) ? state.diffViewInfo.modCode : (isTpl ? state.diffViewInfo.modCode : state.diffViewInfo.sourceCode));
-        navigator.clipboard.writeText(code);
-        const btn = S('copy-btn-'+id); const origHtml = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert'; btn.classList.add('text-success', 'border-success');
-        setTimeout(() => { btn.innerHTML = origHtml; btn.classList.remove('text-success', 'border-success'); }, 2000);
-    }
-}
-S('resizer').onmousedown = () => { document.onmousemove = e => { let pct = ((e.clientX - S('sidebar').offsetWidth) / S('content-view').offsetWidth) * 100; S('pane1').style.flex = `0 0 ${Math.max(10, Math.min(90, pct))}%`; }; document.onmouseup = () => document.onmousemove = null; };
+function copySource(id){ if(state.diffViewInfo){ let isT=state.compareMode==='template', m=S('btn-mode-custom').classList.contains('btn-custom')?'custom':'core', c=id===1?state.diffViewInfo.origCode:((m==='custom'&&!isT)?state.diffViewInfo.modCode:(isT?state.diffViewInfo.modCode:state.diffViewInfo.sourceCode)); navigator.clipboard.writeText(c); const b=S('copy-btn-'+id), oH=b.innerHTML; b.innerHTML='<i class="fa-solid fa-check"></i> Kopiert'; b.classList.add('text-success','border-success'); setTimeout(()=>{b.innerHTML=oH;b.classList.remove('text-success','border-success');},2000); } }
+S('resizer').onmousedown=()=>{document.onmousemove=e=>{S('pane1').style.flex=`0 0 ${Math.max(10,Math.min(90,((e.clientX-S('sidebar').offsetWidth)/S('content-view').offsetWidth)*100))}%`;}; document.onmouseup=()=>document.onmousemove=null;};
 </script>
 </body>
 </html>
