@@ -1,9 +1,9 @@
 {
   "name": "adito-migrator",
-  "version": "1.5",
+  "version": "1.8",
   "main": "index.html",
   "window": {
-    "title": "ADITO Migrator v1.5",
+    "title": "ADITO Migrator v1.8",
     "width": 1500,
     "height": 1000,
     "position": "center",

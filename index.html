@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="dark">
 <head>
-<meta charset="UTF-8"><title>ADITO Migrator v1.5</title>
+<meta charset="UTF-8"><title>ADITO Migrator v1.8</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -19,6 +19,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:1
 .tree-row.active .node-text{color:#fff!important}
 .tree-row>span.node-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;transition:color .1s}
 .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;box-sizing:border-box}
+.group-header .status-dot {display: none !important;}
 .icon-col{width:16px;text-align:center;transition:opacity .1s}
 .group-header{font-weight:700;background:rgba(0,0,0,.3)!important;border-top:1px solid rgba(255,255,255,.05);text-transform:uppercase;font-size:11px;color:#c9d1d9}
 .collapsed+.tree-sub{display:none}
@@ -26,7 +27,7 @@ body{height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:1
 .toggle-icon:hover{color:#c9d1d9}
 .collapsed>.toggle-icon{transform:rotate(-90deg)}
 .no-children>.toggle-icon{visibility:hidden}
-#content-view{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;background:#0d1117}
+#content-view{display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;background:#0d1117;position:relative;}
 .diff-wrapper{display:flex;flex:1;overflow:hidden;position:relative}
 .diff-pane{flex:1 1 50%;overflow-y:auto;padding:15px;min-width:0}
 #resizer{width:4px;cursor:col-resize;background:#30363d;z-index:5;transition:background .2s}
@@ -57,6 +58,10 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
 ::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid #0d1117}
 ::-webkit-scrollbar-thumb:hover{background:#58a6ff}
 ::-webkit-scrollbar-corner{background:#0d1117}
+.custom-scroll-x::-webkit-scrollbar { height: 6px; }
+.custom-scroll-x::-webkit-scrollbar-track { background: #0d1117; border-radius: 3px; }
+.custom-scroll-x::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+.custom-scroll-x::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
 #diff-view-container,#diff-html-target{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 #diff-view-container.d-flex{display:flex!important}
 .d2h-wrapper{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;margin:0}
@@ -65,18 +70,19 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
 .d2h-file-side-diff{flex:1 1 50%;overflow:auto!important;min-height:0;position:relative}
 .d2h-code-wrapper{overflow:visible!important;width:max-content!important;min-width:100%;height:auto!important}
 .d2h-file-header,.d2h-file-list-wrapper,.d2h-file-name-wrapper,.d2h-icon,.d2h-tag{display:none!important}
+mark.search-highlight { padding: 0 2px; }
 </style>
 </head>
 <body>
 
 <header class="main-header d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background:#161b22; border-color:#30363d!important; transition:background .3s, box-shadow .3s;">
-    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.5</div>
+    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.8</div>
     <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
     <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
     <button id="btn-f3" class="btn btn-sm btn-outline-secondary text-light ms-1 text-truncate" style="max-width:250px;" onclick="S('f3').click()"><i class="fa-regular fa-folder"></i> 3. Template</button>
     <div class="d-flex align-items-center ms-3">
         <select id="entitySelect" class="form-select form-select-sm w-auto bg-dark text-light" disabled><option value="">Warte auf Projekte...</option></select>
-        <button class="btn btn-sm btn-primary ms-2" onclick="startAnalysis()" id="btn-analyze" disabled title="Entity analysieren"><i class="fa-solid fa-play"></i></button>
+        <button class="btn btn-sm btn-primary ms-2" onclick="startAnalysis()" id="btn-analyze" disabled title="Context analysieren"><i class="fa-solid fa-play"></i></button>
         <button class="btn btn-sm btn-outline-info ms-1 d-none" onclick="reloadEntity()" id="btn-reload" title="Kompletten Reload erzwingen"><i class="fa-solid fa-rotate"></i></button>
         <div class="form-check form-switch ms-4 mb-0 d-none d-flex align-items-center" id="tpl-toggle-container">
             <input class="form-check-input shadow-sm mt-0 me-2" type="checkbox" id="tplToggle" onchange="toggleMode()" style="width:3em; height:1.5em; cursor:pointer;">
@@ -90,7 +96,7 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
         <span><div class="status-dot d-inline-block" style="border:1px solid #30363d; background:transparent;"></div> Gleich</span>
         <span><div class="status-dot d-inline-block" style="background-color:#3fb950!important;"></div> Neu</span>
         <span><div class="status-dot bg-danger d-inline-block"></div> Fehlt</span>
-        <span><div class="status-dot bg-warning d-inline-block"></div> Geändert</span>
+        <span><div class="status-dot bg-warning d-inline-block"></div> Modifiziert</span>
         <span><div class="status-dot d-inline-block legend-proc" style="border:2px solid #d29922; background:transparent;"></div> Prozess-Diff</span>
     </div>
     <input type="file" id="f1" nwdirectory hidden><input type="file" id="f2" nwdirectory hidden><input type="file" id="f3" nwdirectory hidden>
@@ -119,6 +125,17 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
     </div>
     
     <div id="content-view">
+        <div id="custom-search-bar" class="position-absolute p-2 bg-dark border border-secondary rounded shadow-lg z-3 d-none d-flex align-items-center gap-2" style="top: 10px; right: 20px; width: 350px;">
+            <i class="fa-solid fa-search text-secondary ms-1"></i>
+            <input type="text" id="custom-search-input" class="form-control form-control-sm bg-transparent text-light border-0 shadow-none p-0" placeholder="Suchen" oninput="handleSearch(this.value)" onkeydown="if(event.key==='Enter') jumpSearch(1)">
+            <span id="custom-search-count" class="text-secondary small font-monospace" style="min-width: 45px; text-align:right;">0/0</span>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary border-0 py-0" onclick="jumpSearch(-1)"><i class="fa-solid fa-chevron-up"></i></button>
+                <button class="btn btn-outline-secondary border-0 py-0" onclick="jumpSearch(1)"><i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+            <button class="btn btn-link text-secondary p-0 ms-1 me-1" onclick="closeSearch()"><i class="fa-solid fa-times"></i></button>
+        </div>
+
         <div class="p-2 border-bottom d-flex align-items-center justify-content-between" style="background:#161b22; border-color:#30363d!important;">
             <div id="view-title" class="fw-bold" style="color:#c9d1d9;">Bitte ein Element auswählen</div>
             <div class="d-flex align-items-center gap-2">
@@ -126,12 +143,15 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
                     <button class="btn btn-secondary fw-bold" id="btn-mode-core" onclick="setMode('core')">Modul Core</button>
                     <button class="btn btn-outline-secondary" id="btn-mode-custom" onclick="setMode('custom')"><i class="fa-solid fa-wrench"></i> Custom</button>
                 </div>
+                
+                <button class="btn btn-sm btn-outline-secondary d-none" id="btn-xml-view" onclick="toggleXmlView()"><i class="fa-solid fa-code"></i> XML Ansicht</button>
+                <button class="btn btn-sm btn-outline-warning me-2 d-none" id="btn-debug-toggle" onclick="toggleDebugBanner()"><i class="fa-solid fa-bug"></i> Debug</button>
+                
                 <div id="diff-toolbar" class="d-none align-items-center gap-2 border-start border-secondary ps-3 ms-1">
                     <div class="form-check form-switch me-3 mb-0 text-light d-flex align-items-center">
                         <input class="form-check-input mt-0 me-2" type="checkbox" id="rawDiffToggle" onchange="setDiffMode(state.currentMode)" style="width:3em; height:1.5em; cursor:pointer;">
                         <label class="form-check-label fw-bold" for="rawDiffToggle" style="font-size:14px; cursor:pointer; padding-top:2px;">Raw Mode</label>
                     </div>
-                    <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDebugBanner()"><i class="fa-solid fa-bug"></i> Debug</button>
                     <button class="btn btn-sm btn-outline-info me-2" onclick="reloadCurrentProcess()"><i class="fa-solid fa-rotate"></i></button>
                     <div class="btn-group btn-group-sm">
                         <button class="btn btn-outline-secondary" id="copy-btn-1" onclick="copySource(1)"><i class="fa-regular fa-copy"></i> Links</button>
@@ -144,11 +164,15 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
         <div id="debug-banner" class="d-none bg-dark p-2" style="font-size:11px; border-bottom:1px solid #b8860b; box-shadow:inset 0 -2px 5px rgba(0,0,0,.3);">
             <div class="row m-0 w-100">
                 <div class="col-6 d-flex align-items-center border-end border-secondary">
-                    <span class="text-secondary fw-bold me-2">BASE:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-orig">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyPath('orig')"><i class="fa-solid fa-copy"></i></button>
+                    <span class="text-secondary fw-bold me-2">BASE:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-orig" data-full="">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyText(S('debug-path-orig').dataset.full, this)"><i class="fa-solid fa-copy"></i></button>
                 </div>
                 <div class="col-6 d-flex align-items-center">
-                    <span class="text-secondary fw-bold me-2">TARGET:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-mod">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyPath('mod')"><i class="fa-solid fa-copy"></i></button>
+                    <span class="text-secondary fw-bold me-2">TARGET:</span><span class="font-monospace text-warning text-truncate flex-grow-1" id="debug-path-mod" data-full="">...</span><button class="btn btn-sm btn-outline-secondary py-0 ms-2" style="font-size:10px;" onclick="copyText(S('debug-path-mod').dataset.full, this)"><i class="fa-solid fa-copy"></i></button>
                 </div>
+            </div>
+            <div id="debug-mods-container" class="mt-2 pt-2 border-top border-secondary d-none">
+                <span class="text-secondary fw-bold">MODIFICATIONS:</span>
+                <div id="debug-mods-list" class="mt-1"></div>
             </div>
         </div>
 
@@ -162,12 +186,14 @@ const fs=typeof require!=='undefined'?require('fs'):null, path=typeof require!==
 const S=i=>document.getElementById(i), esc=u=>u?u.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):"";
 window.projNameOrig=window.projNameMod=window.projNameTpl="";
 
+const IGNORED_FOLDERS = new Set([ 'dist', '.git', '.aditoprj', 'application', 'entitywebservice', 'language', 'neondashboard', 'others', 'preferences', 'scripts', 'system' ]);
+
 const getUniq= (a,b)=>[...new Map([...(a||[]),...(b||[])].filter(x=>x&&x.name).map(x=>[x.name.toLowerCase(),x.name])).values()];
 const findCI=(a,n)=>n&&a?a.find(x=>x&&x.name&&x.name.toLowerCase()===n.toLowerCase()):undefined;
 const getTplCI=(m,n)=>n?m[Object.keys(m).find(k=>k.toLowerCase()===n.toLowerCase())]:undefined;
 const getRefsCI=(m,n)=>new Set(n?Object.keys(m).filter(k=>k.toLowerCase()===n.toLowerCase()).flatMap(k=>[...m[k]]):[]);
 
-const ADITO_PROCESS_NAMES_ARR=["titleProcess","linkedContextProcess","tooltipProcess","placeholderProcess","valueProcess","displayProcess","displayValueProcess","onValidation","onValueChange","dropDownProcess","colorProcess","stateProcess","mandatoryProcess","selectionModeProcess","contentTypeProcess","expression","iconProcess","onInit","afterUIiInit","beforeOperatingState","afterOperatingState","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess","grantCreateProcess","grantUpdateProcess","grantDeleteProcess","imageProcess","iconIdProcess","uniqueProviderKeyProcess","targetConsumerProcess","filterVariablesProcess","onActionProcess","process","filterConditionProcess","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete","filterFieldsProcess","filterValuesProcess","recordContainerProcess","contentProcess","groupQueryProcess","patternExtensionProcess","boostPatternProcess","defaultAction","rowCountProcess","onInsert","onUpdate","onDelete","cacheKeyProcess","titlePluralProcess","externalInitFilterProcess"];
+const ADITO_PROCESS_NAMES_ARR=["titleProcess","linkedContextProcess","tooltipProcess","placeholderProcess","valueProcess","displayProcess","displayValueProcess","onValidation","onValueChange","dropDownProcess","colorProcess","stateProcess","mandatoryProcess","selectionModeProcess","contentTypeProcess","expression","iconProcess","onInit","afterUIiInit","beforeOperatingState","afterOperatingState","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess","grantCreateProcess","grantUpdateProcess","grantDeleteProcess","imageProcess","iconIdProcess","uniqueProviderKeyProcess","targetConsumerProcess","filterVariablesProcess","onActionProcess","process","filterConditionProcess","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete","filterFieldsProcess","filterValuesProcess","recordContainerProcess","contentProcess","groupQueryProcess","patternExtensionProcess","boostPatternProcess","defaultAction","rowCountProcess","onInsert","onUpdate","onDelete","cacheKeyProcess","titlePluralProcess","externalInitFilterProcess","documentation"];
 const ADITO_PROCESS_NAMES=new Set(ADITO_PROCESS_NAMES_ARR);
 const XML_WRAPPERS=new Set(["entityFields","recordContainers","recordFieldMappings","implementations","children","filterExtensions"]);
 const IGNORE_AS_PROPS=new Set([...XML_WRAPPERS,"modelValueWrapper","stringValueWrapper"]);
@@ -181,18 +207,19 @@ function registerNodePair(o,m){let id=(m?.id||o?.id); window._nodeRegistry[id]={
 window.triggerDiffFromProp=(rId,p)=>{let d=window._nodeRegistry[rId]; loadDiff(p,d.o?.procs?.[p],d.m?.procs?.[p],d.m,d.o);};
 
 class AditoProject {
-    constructor(p,n){this.rootPath=p; this.name=n; this.files=new Map(); this.entities=new Set(); this.contextMap=new Map(); this.viewRefs={}; this.viewRoles={}; this.contextViews=new Map(); this.customViewsMod=new Set();}
+    constructor(p,n){this.rootPath=p; this.name=n; this.files=new Map(); this.contextMap=new Map(); this.contextToEntity=new Map(); this.viewRefs={}; this.viewRoles={}; this.contextViews=new Map(); this.customViewsMod=new Set();}
     async index(){
-        if(!fs)return; this.files.clear(); this.entities.clear(); this.contextMap.clear(); this.viewRefs={}; this.viewRoles={}; this.contextViews.clear(); this.customViewsMod.clear(); this._walk(this.rootPath);
+        if(!fs)return; this.files.clear(); this.contextMap.clear(); this.contextToEntity.clear(); this.viewRefs={}; this.viewRoles={}; this.contextViews.clear(); this.customViewsMod.clear(); this._walk(this.rootPath);
         for(const [k,o] of this.files){
-            if(k.endsWith('_entity.aod')&&k.includes('entity/')) this.entities.add(path.basename(o.fullPath,'.aod'));
             if(k.endsWith('.aod')&&k.includes('neoncontext/')){
                 const t=await this.readText(o.fullPath); if(!t)continue;
                 const m=t.match(/<entity>([^<]+)<\/entity>/); if(!m)continue;
-                const e=m[1].toLowerCase(), c=path.basename(o.fullPath,'.aod'); this.contextMap.set(e,c);
-                if(!this.contextViews.has(e))this.contextViews.set(e,new Set()); const vS=this.contextViews.get(e);
+                const e=m[1].trim(), c=path.basename(o.fullPath,'.aod'); 
+                this.contextMap.set(e.toLowerCase(), c);
+                this.contextToEntity.set(c, e);
+                if(!this.contextViews.has(e.toLowerCase()))this.contextViews.set(e.toLowerCase(),new Set()); const vS=this.contextViews.get(e.toLowerCase());
                 ['mainView','filterView','editView','previewView','previewMultipleView','lookupView'].forEach(tag=>{
-                    let r=new RegExp(`<${tag}>([^<]+)<\\/${tag}>`,'g'), mm; while((mm=r.exec(t))!==null){ vS.add(mm[1]); this.viewRoles[mm[1]]=tag; (this.viewRefs[mm[1]]=this.viewRefs[mm[1]]||new Set()).add(`Context: ${c}`); }
+                    let r=new RegExp(`<${tag}>([^<]+)<\\/${tag}>`,'g'), mm; while((mm=r.exec(t))!==null){ vS.add(mm[1]); (this.viewRoles[mm[1]]=this.viewRoles[mm[1]]||new Set()).add(tag); (this.viewRefs[mm[1]]=this.viewRefs[mm[1]]||new Set()).add(`Context: ${c}`); }
                 });
                 let refR=/<neonViewReference>[\s\S]*?<view>([^<]+)<\/view>[\s\S]*?<\/neonViewReference>/g, rm;
                 while((rm=refR.exec(t))!==null) { vS.add(rm[1]); (this.viewRefs[rm[1]]=this.viewRefs[rm[1]]||new Set()).add(`Context: ${c}`); }
@@ -200,6 +227,7 @@ class AditoProject {
         }
         for(const [k,o] of this.files){
             if(k.includes('modification/')&&k.endsWith('.aod')){
+                const isRootMod = !k.includes('node_modules/');
                 const t=await this.readText(o.fullPath);
                 if(t&&t.includes('<modelType>neonContext</modelType>')){
                     const m=t.match(/<modelName>([^<]+)<\/modelName>/); if(!m)continue;
@@ -207,20 +235,49 @@ class AditoProject {
                     let vS=this.contextViews.get(eN); if(!vS)this.contextViews.set(eN,vS=new Set());
                     let pM=t.match(/<path>[^\/]+\/(mainView|filterView|editView|previewView|previewMultipleView|lookupView)<\/path>/);
                     [...t.matchAll(/<(?:view|value)>([^<]+_view)<\/(?:view|value)>/g)].forEach(mm=>{
-                        let v=mm[1].trim(); vS.add(v); (this.viewRefs[v]=this.viewRefs[v]||new Set()).add(`Context: ${cN}`); if(pM)this.viewRoles[v]=pM[1]; this.customViewsMod.add(v);
+                        let v=mm[1].trim(); vS.add(v); (this.viewRefs[v]=this.viewRefs[v]||new Set()).add(`Context: ${cN}`); if(pM)(this.viewRoles[v]=this.viewRoles[v]||new Set()).add(pM[1]); 
+                        if(isRootMod) this.customViewsMod.add(v);
                     });
                 }
             }
         }
     }
-    _walk(d){ try{fs.readdirSync(d).forEach(f=>{let fp=path.join(d,f); if(fs.statSync(fp).isDirectory()){if(!['dist','node_modules_ignored','.git'].includes(f))this._walk(fp);}else{let rp=fp.substring(this.rootPath.length+1).replace(/\\/g,'/');this.files.set(rp.toLowerCase(),{path:rp,fullPath:fp});}});}catch(e){} }
+    
+    _walk(d, isNm = false) { 
+        try { 
+            fs.readdirSync(d).forEach(f => {
+                let fp = path.join(d, f);
+                let fl = f.toLowerCase();
+                
+                if (fs.statSync(fp).isDirectory()) {
+                    if (IGNORED_FOLDERS.has(fl)) return;
+                    let nextIsNm = isNm;
+                    if (fl === 'node_modules') {
+                        nextIsNm = true;
+                    } else if (isNm && path.basename(d).toLowerCase() === 'node_modules') {
+                        if (fl !== '@aditosoftware') return;
+                    }
+                    this._walk(fp, nextIsNm);
+                } else {
+                    let rp = fp.substring(this.rootPath.length + 1).replace(/\\/g, '/');
+                    this.files.set(rp.toLowerCase(), { path: rp, fullPath: fp });
+                }
+            });
+        } catch (e) {} 
+    }
+    
     async readText(fp){return fs.existsSync(fp)?fs.readFileSync(fp,'utf-8'):null;}
     async readXml(fp){const t=await this.readText(fp);return t?new DOMParser().parseFromString(t,"text/xml").documentElement:null;}
-    findFile(p){const s=p.toLowerCase().replace('%aditoprj%/',''); for(const [k,v] of this.files)if(k.endsWith(s))return v; return null;}
+    findFile(p){
+        if(!p) return null;
+        const s=p.toLowerCase().replace('%aditoprj%/',''); 
+        for(const [k,v] of this.files) if(k.endsWith(s)) return v; 
+        return null;
+    }
 }
 
 let projOrig=null, projMod=null, projTemplate=null;
-let state={rawOrigData:null, rawModData:null, rawTemplateData:null, origData:null, modData:null, templateData:null, origTemplateData:null, compareMode:'modular', diffViewInfo:null, currentMode:'custom', treeState:{expanded:new Set(),activeId:null}, currentViewXml:{}};
+let state={rawOrigData:null, rawModData:null, rawTemplateData:null, origData:null, modData:null, templateData:null, origTemplateData:null, compareMode:'modular', diffViewInfo:null, currentMode:'custom', debugOpen:false, treeState:{expanded:new Set(),activeId:null}, currentViewXml:{}};
 
 async function loadProject(el,ref,btnId){
     if(!el.value)return; const btn=S(btnId); btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Lade...`; await new Promise(r=>setTimeout(r,50));
@@ -231,10 +288,34 @@ async function loadProject(el,ref,btnId){
 S('f1').onchange=e=>loadProject(e.target,"Original",'btn-f1'); S('f2').onchange=e=>loadProject(e.target,"Modular",'btn-f2'); S('f3').onchange=e=>loadProject(e.target,"Template",'btn-f3');
 
 function checkReady(){
-    S('file-status').textContent=`${(projOrig?.files.size||0)+(projMod?.files.size||0)+(projTemplate?.files.size||0)} Dateien.`;
+    let cnt = (projOrig?.files.size||0)+(projMod?.files.size||0)+(projTemplate?.files.size||0);
+    S('file-status').textContent=`${cnt} Dateien.`;
     if(projOrig||projMod||projTemplate){
-        const sel=S('entitySelect'); sel.innerHTML='<option value="">Entity auswählen...</option>';
-        [...new Set([...(projOrig?.entities||[]),...(projMod?.entities||[]),...(projTemplate?.entities||[])])].sort().forEach(e=>sel.add(new Option(e,e)));
+        const sel=S('entitySelect'); sel.innerHTML='<option value="">Context auswählen...</option>';
+        const validContexts = new Map();
+        
+        const checkEntity = (e) => {
+            const ef = e.toLowerCase() + '.aod';
+            return [projOrig, projMod, projTemplate].some(p => {
+                if(!p) return false;
+                for(const k of p.files.keys()) {
+                    if(k.endsWith('/' + ef) || k === ef) return true;
+                }
+                return false;
+            });
+        };
+
+        [projOrig, projMod, projTemplate].forEach(p => {
+            if(!p) return;
+            for(const [c, e] of p.contextToEntity) {
+                if(!validContexts.has(c) && checkEntity(e)) validContexts.set(c, e);
+            }
+        });
+
+        [...validContexts.keys()].sort((a,b)=>a.localeCompare(b)).forEach(c => {
+            sel.add(new Option(c, validContexts.get(c))); 
+        });
+
         sel.disabled=false; S('btn-analyze').disabled=false; S('btn-reload').classList.remove('d-none');
     }
     if(projOrig&&projTemplate) S('tpl-toggle-container').classList.remove('d-none');
@@ -262,29 +343,40 @@ function saveTreeState(){ state.treeState.expanded.clear(); document.querySelect
 function toggleMode(){ state.compareMode=S('tplToggle').checked?'template':'modular'; saveTreeState(); document.body.classList.toggle('template-mode',state.compareMode==='template'); renderTree(); }
 function renderTreeStateful(){ saveTreeState(); renderTree(); }
 
-class TreeNode { constructor(n,t,f,id){this.id=id; this.name=n; this.type=t; this.file=f; this.props={}; this.coreProps={}; this.procs={}; this.coreProcs={}; this.procContents={}; this.coreProcContents={}; this.children=[]; this.isCustom=false; this.customProps=new Set(); this.customProcs=new Set(); this.isDeleted=false; this.isExt=false; this.rawXml=null;} }
+class TreeNode { constructor(n,t,f,id){this.id=id; this.name=n; this.type=t; this.file=f; this.props={}; this.coreProps={}; this.procs={}; this.coreProcs={}; this.procContents={}; this.coreProcContents={}; this.children=[]; this.isCustom=false; this.customProps=new Set(); this.customProcs=new Set(); this.isDeleted=false; this.isExt=false; this.rawXml=null; this.modPaths=new Set(); this.modMap={};} }
 
 function cloneNode(node) {
     if(!node) return null; let n=new TreeNode(node.name, node.type, node.file, node.id);
     n.props={...node.props}; n.coreProps={...node.coreProps}; n.procs={...node.procs}; n.coreProcs={...node.coreProcs}; n.procContents={...node.procContents}; n.coreProcContents={...node.coreProcContents};
-    n.isCustom=node.isCustom; n.customProps=new Set(node.customProps); n.customProcs=new Set(node.customProcs); n.isDeleted=node.isDeleted; n.isExt=node.isExt; n.rawXml=node.rawXml;
+    n.isCustom=node.isCustom; n.customProps=new Set(node.customProps); n.customProcs=new Set(node.customProcs); n.isDeleted=node.isDeleted; n.isExt=node.isExt; n.rawXml=node.rawXml; n.modPaths=new Set(node.modPaths);
+    
+    n.modMap={}; for(let k in node.modMap) n.modMap[k]=new Set(node.modMap[k]);
     n.children=(node.children||[]).map(cloneNode); return n;
 }
 function cloneData(data) { return data?{entity:cloneNode(data.entity),context:cloneNode(data.context),views:(data.views||[]).map(cloneNode)}:null; }
 
 function extractTemplates(x){
     let t={items:{},order:[]}; if(!x)return t; let ch=x.getElementsByTagName('children')[0]; if(!ch)return t;
-    Array.from(ch.childNodes).filter(n=>n.nodeType===1).forEach(c=>{
-        let typ=c.nodeName, nmN=c.getElementsByTagName('name')[0], nm=nmN?nmN.textContent.trim():typ;
+    const parseNode = (c, curEp) => {
+        let typ=c.nodeName;
+        if(typ.toLowerCase().includes('extensionpoint')){
+            let nN=c.getElementsByTagName('name')[0], ep=nN?nN.textContent.trim():typ, impls=c.getElementsByTagName('implementations')[0];
+            if(impls) Array.from(impls.childNodes).filter(n=>n.nodeType===1).forEach(ic=>parseNode(ic, ep));
+            return;
+        }
+        let nmN=c.getElementsByTagName('name')[0], nm=nmN?nmN.textContent.trim():typ;
         if(typ==='neonViewReference'){let v=c.getElementsByTagName('view')[0]; if(v)nm=v.textContent.trim();}
+        let extPath = c.getAttribute('data-ext-path'), ep = curEp;
+        if(extPath){ let epMatch=extPath.match(/([a-zA-Z0-9_]+ExtensionPoint)/i); if(epMatch) ep=epMatch[1]; }
         let p={}; Array.from(c.childNodes).filter(n=>n.nodeType===1&&n.nodeName!=='name').forEach(s=>{
             let v=s.textContent.trim();
-            if(s.firstElementChild) v=Array.from(s.childNodes).filter(x=>x.nodeType===1).map(x=>{let ef=x.getElementsByTagName('entityField')[0]||x.getElementsByTagName('view')[0]||x.getElementsByTagName('element')[0]; if(ef)return ef.textContent.trim(); let nN=x.getElementsByTagName('name')[0]; if(nN&&nN.textContent.length===36)return ""; return x.textContent.trim();}).filter(v=>v).join(' • ');
+            if(s.firstElementChild) v=Array.from(s.childNodes).filter(x=>x.nodeType===1).map(x=>{let ef=x.getElementsByTagName('entityField')[0]||x.getElementsByTagName('view')[0]||x.getElementsByTagName('element')[0]; if(ef)return ef.textContent.trim(); let nN=x.getElementsByTagName('name')[0]; if(nN&&nN.textContent.length===36)return ""; return x.textContent.trim();}).filter(v=>v).join('|||');
             else if(v==="") v=s.getAttribute('v')||s.getAttribute('value')||"";
             p[s.nodeName]=v;
         });
-        let onm=nm; while(getTplCI(t.items,nm))nm+="_dup"; t.items[nm]={type:typ,props:p,originalName:onm}; t.order.push(nm);
-    }); return t;
+        let onm=nm; while(getTplCI(t.items,nm))nm+="_dup"; t.items[nm]={type:typ,props:p,originalName:onm, extPoint: ep||null}; t.order.push(nm);
+    };
+    Array.from(ch.childNodes).filter(n=>n.nodeType===1).forEach(c=>parseNode(c, null)); return t;
 }
 
 function harmonizeExtensionPointsRecursive(origNode, modNode) {
@@ -320,35 +412,115 @@ async function buildData(p,eN) {
     if(!p)return{entity:null,context:null,views:[]}; const eL=eN.toLowerCase(), cN=p.contextMap.get(eL); let res={entity:new TreeNode(eN,"entity",null,'root_ent'),context:null,views:[]}, aV=p.contextViews.get(eL)||new Set();
     for(const [k,fo] of p.files){
         if(!k.endsWith('.aod')||k.includes('modification/'))continue;
-        if(k.includes(`/${eL}.aod`)||k.includes(`/${eL}_entity/`)){ const x=await p.readXml(fo.fullPath); if(x&&x.nodeName==='entity'){res.entity.file=fo; await extractNodeDataAsync(x,res.entity,p);} if(x)await parseWalkerAsync(x,res.entity,fo,false,p); }
-        else if(cN&&k.includes(`neoncontext/${cN.toLowerCase()}.aod`)){ const x=await p.readXml(fo.fullPath); if(x){res.context=new TreeNode(cN,"neonContext",fo,'root_ctx'); await extractNodeDataAsync(x,res.context,p);} }
+        if(k.includes(`/${eL}.aod`)||k.includes(`/${eL}/`)){ 
+            const x=await p.readXml(fo.fullPath); 
+            if(x){
+                if(x.nodeName==='entity'){
+                    res.entity.file=fo;
+                    res.entity.rawXml=x;
+                    await extractNodeDataAsync(x,res.entity,p);
+                    await parseWalkerAsync(x,res.entity,fo,false,p);
+                } else {
+                    const dum=x.ownerDocument.createElement('wrapper');
+                    dum.appendChild(x.cloneNode(true));
+                    await parseWalkerAsync(dum,res.entity,fo,false,p);
+                }
+            }
+        }
+        else if(cN&&k.includes(`neoncontext/${cN.toLowerCase()}.aod`)){ const x=await p.readXml(fo.fullPath); if(x){res.context=new TreeNode(cN,"neonContext",fo,'root_ctx'); res.context.rawXml=x; await extractNodeDataAsync(x,res.context,p);} }
         else if(k.includes('neonview/')){ let vN=path.basename(fo.fullPath,'.aod'); if([...aV].some(v=>v.toLowerCase()===vN.toLowerCase())){ const x=await p.readXml(fo.fullPath); if(x){ let vn=new TreeNode(vN,"neonView",fo,'view_'+vN); vn.rawXml=x; if([...p.customViewsMod].some(v=>v.toLowerCase()===vN.toLowerCase()))vn.isCustom=true; vn.refContexts=[...getRefsCI(p.viewRefs,vN)]; await extractNodeDataAsync(x,vn,p); res.views.push(vn); } } }
     }
-    if(p.name==="Modular"){ for(const [k,fo] of p.files){ if(k.includes('modification/')&&k.endsWith('.aod')){ const x=await p.readXml(fo.fullPath); if(x){ const mT=x.getElementsByTagName('modelName')[0]?.textContent; if(mT){ if(mT.toLowerCase()===eL)await applyModAsync(x,res.entity,fo,p); else{let tV=findCI(res.views,mT); if(tV)tV.isCustom=!fo.path.includes('node_modules');} } } } } }
+    if(p.name==="Modular"){ 
+        for(const [k,fo] of p.files){ 
+            if(k.includes('modification/')&&k.endsWith('.aod')){ 
+                const isRootMod = !k.includes('node_modules/');
+                const x=await p.readXml(fo.fullPath); 
+                if(x){ 
+                    const mT=x.getElementsByTagName('modelName')[0]?.textContent; 
+                    const modType=x.getElementsByTagName('modelType')[0]?.textContent;
+                    if(mT){ 
+                        let tV=findCI(res.views,mT);
+                        if(tV && (modType==='neonView' || !modType)){
+                            tV.modPaths.add(fo);
+                            if(isRootMod) tV.isCustom = true;
+                            const cT=x.getElementsByTagName('changeType')[0]?.textContent;
+                            if(cT==='INSERT'){
+                                const w=x.getElementsByTagName('modelValueWrapper');
+                                if(w.length>0&&w[0].firstElementChild){
+                                    let i=[...w[0].childNodes].find(n=>n.nodeName==='value');
+                                    if(i&&i.firstElementChild){
+                                        let targetChildren = tV.rawXml.getElementsByTagName('children')[0];
+                                        if(!targetChildren){
+                                            targetChildren = tV.rawXml.ownerDocument.createElement('children');
+                                            tV.rawXml.appendChild(targetChildren);
+                                        }
+                                        let clone = i.firstElementChild.cloneNode(true);
+                                        let pathText = x.getElementsByTagName('path')[0]?.textContent || "";
+                                        if(pathText.includes('ExtensionPoint')) clone.setAttribute('data-ext-path', pathText);
+                                        targetChildren.appendChild(clone);
+                                    }
+                                }
+                            }
+                        } else if (mT.toLowerCase()===eL) {
+                            await applyModAsync(x,res.entity,fo,p); 
+                        } 
+                    } 
+                } 
+            } 
+        } 
+    }
     return res;
 }
 
-function getDeepValue(n){ if(!n)return""; let els=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName==='element'); if(els.length>0)return els.map(e=>e.textContent.trim()).join('|'); let ch=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName!=='name'); return ch.length===0?(n.textContent.trim()||n.getAttribute('v')||n.getAttribute('value')||""):getDeepValue(ch[0]); }
+function getDeepValue(n){ if(!n)return""; let els=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName==='element'); if(els.length>0)return els.map(e=>e.textContent.trim()).join('|||'); let ch=[...n.childNodes].filter(x=>x.nodeType===1&&x.nodeName!=='name'); return ch.length===0?(n.textContent.trim()||n.getAttribute('v')||n.getAttribute('value')||""):getDeepValue(ch[0]); }
 
 async function extractNodeDataAsync(x,tN,p){
     for(let c of [...x.childNodes]){
         if(c.nodeType===1&&c.nodeName!=='name'&&!IGNORE_AS_PROPS.has(c.nodeName)){
             let v="", els=[...c.childNodes].filter(n=>n.nodeType===1&&n.nodeName==='element');
-            if(els.length>0)v=els.map(el=>el.textContent.trim()).join('|');
-            else if(c.firstElementChild)v=[...c.childNodes].filter(s=>s.nodeType===1&&s.nodeName!=='name').map(s=>`${s.nodeName}: ${s.textContent.trim()||s.getAttribute('v')||s.getAttribute('value')||""}`).join(' | ');
-            else v=c.textContent.trim()||c.getAttribute('v')||c.getAttribute('value')||"";
-            if(ADITO_PROCESS_NAMES.has(c.nodeName)){ tN.procs[c.nodeName]=v; let f=(v==='process.js'||v==='./process.js')?[...p.files.values()].find(fl=>fl.fullPath===path.join(path.dirname(tN.file.fullPath),'process.js')):p.findFile(v); if(f)tN.procContents[c.nodeName]=await p.readText(f.fullPath); } else tN.props[c.nodeName]=v;
+            
+            if(els.length>0){
+                v=els.map(el=>el.textContent.trim()).join('|||');
+            } else if (c.nodeName === 'dashletConfigurations') {
+                let arr = [];
+                for(let d of c.children) {
+                    let objProps = [];
+                    for(let f of d.children) {
+                        if(f.children.length > 0 && f.nodeName !== 'name') {
+                            objProps.push(`${f.nodeName}: ` + [...f.children].map(cp=>cp.textContent).join(', '));
+                        } else {
+                            objProps.push(`${f.nodeName}: ${f.textContent.trim()}`);
+                        }
+                    }
+                    arr.push(objProps.join(' | '));
+                }
+                v = arr.join('|||');
+            } else if(c.firstElementChild) {
+                v=[...c.childNodes].filter(s=>s.nodeType===1&&s.nodeName!=='name').map(s=>`${s.nodeName}: ${s.textContent.trim()||s.getAttribute('v')||s.getAttribute('value')||""}`).join(' | ');
+            } else {
+                v=c.textContent.trim()||c.getAttribute('v')||c.getAttribute('value')||"";
+            }
+            
+            if(ADITO_PROCESS_NAMES.has(c.nodeName)){ 
+                tN.procs[c.nodeName]=v; 
+                if(v) {
+                    let f=(v==='process.js'||v==='./process.js')?[...p.files.values()].find(fl=>fl.fullPath===path.join(path.dirname(tN.file.fullPath),'process.js')):p.findFile(v); 
+                    if(f) tN.procContents[c.nodeName]=await p.readText(f.fullPath); 
+                }
+            } else {
+                tN.props[c.nodeName]=v;
+            }
         }
     }
 }
 
-async function parseWalkerAsync(x,pT,fo,isC,p){
+async function parseWalkerAsync(x,pT,fo,isC,p, modPath=null){
     for(let c of [...x.childNodes]){
         if(c.nodeType!==1)continue; let nl=c.nodeName.toLowerCase(), isE=nl.includes('extensionpoint')||(nl!=='entityservicedefinition'&&nl!=='entityactiongroup'&&[...c.childNodes].some(n=>n.nodeName.toLowerCase()==='implementations'));
-        if(isE){ let bT=c.nodeName.replace('ExtensionPoint',''), impls=[...c.childNodes].find(n=>n.nodeName==='implementations'); if(impls&&impls.firstElementChild)bT=impls.firstElementChild.nodeName; const nm=c.getElementsByTagName('name')[0]?.textContent||c.nodeName; let ext=new TreeNode(nm,bT,fo,pT.id+'_'+nm); ext.isExt=true; pT.children.push(ext); if(impls)await parseWalkerAsync(impls,ext,fo,isC,p); continue; }
-        if(XML_WRAPPERS.has(c.nodeName)){await parseWalkerAsync(c,pT,fo,isC,p);continue;}
+        if(isE){ let bT=c.nodeName.replace('ExtensionPoint',''), impls=[...c.childNodes].find(n=>n.nodeName==='implementations'); if(impls&&impls.firstElementChild)bT=impls.firstElementChild.nodeName; const nm=c.getElementsByTagName('name')[0]?.textContent||c.nodeName; let ext=new TreeNode(nm,bT,fo,pT.id+'_'+nm); ext.isExt=true; pT.children.push(ext); if(impls)await parseWalkerAsync(impls,ext,fo,isC,p,modPath); continue; }
+        if(XML_WRAPPERS.has(c.nodeName)){await parseWalkerAsync(c,pT,fo,isC,p,modPath);continue;}
         const nN=[...c.childNodes].find(n=>n.nodeName==='name');
-        if(nN&&!IGNORE_AS_PROPS.has(c.nodeName)){ let t=c.nodeName; if(t.endsWith('RecordContainer'))t='recordContainer'; if(t.endsWith('RecordFieldMapping')||t==='consumerMapping')t='recordFieldMapping'; let n=new TreeNode(nN.textContent.trim(),t,fo,pT.id+'_'+nN.textContent.trim()); n.isCustom=isC; if(pT.type==='ExtensionPoint')n.isExt=true; await extractNodeDataAsync(c,n,p); pT.children.push(n); await parseWalkerAsync(c,n,fo,isC,p); }
+        if(nN&&!IGNORE_AS_PROPS.has(c.nodeName)){ let t=c.nodeName; if(t.endsWith('RecordContainer'))t='recordContainer'; if(t.endsWith('RecordFieldMapping')||t==='consumerMapping')t='recordFieldMapping'; let n=new TreeNode(nN.textContent.trim(),t,fo,pT.id+'_'+nN.textContent.trim()); n.isCustom=isC; if(modPath) n.modPaths.add(modPath); if(pT.type==='ExtensionPoint')n.isExt=true; await extractNodeDataAsync(c,n,p); pT.children.push(n); await parseWalkerAsync(c,n,fo,isC,p,modPath); }
     }
 }
 
@@ -356,10 +528,12 @@ async function applyModAsync(x,rT,fo,p){
     const cT=x.getElementsByTagName('changeType')[0]?.textContent, pP=(x.getElementsByTagName('path')[0]?.textContent||"").split('/').filter(p=>!XML_WRAPPERS.has(p)&&p.toLowerCase()!==rT.name.toLowerCase()), isC=!fo.path.includes('node_modules');
     const fN=a=>{let c=rT;for(let p of a){let n=findCI(c.children,p);if(!n)return null;c=n;}return c;};
     if(cT==='MODIFY'){
-        const pN=pP.pop(); let t=fN(pP); if(t){ let vN=x.getElementsByTagName('value')[0], v=vN?getDeepValue(vN):""; if(Object.keys(t.coreProps).length===0)Object.assign(t.coreProps,t.props);
+        const pN=pP.pop(); let t=fN(pP); if(t){ 
+            t.modMap = t.modMap || {}; t.modMap[pN] = t.modMap[pN] || new Set(); t.modMap[pN].add(fo);
+            let vN=x.getElementsByTagName('value')[0], v=vN?getDeepValue(vN):""; if(Object.keys(t.coreProps).length===0)Object.assign(t.coreProps,t.props);
         if(ADITO_PROCESS_NAMES.has(pN)){ t.coreProcContents[pN]=t.procContents[pN]; t.coreProcs[pN]=t.procs[pN]; t.procs[pN]=v; let f=p.findFile(v); if(f)t.procContents[pN]=await p.readText(f.fullPath); if(isC)t.customProcs.add(pN); } else{ t.props[pN]=v; if(isC)t.customProps.add(pN); } }
-    } else if(cT==='INSERT'){ const w=x.getElementsByTagName('modelValueWrapper'); if(w.length>0&&w[0].firstElementChild){ let i=[...w[0].childNodes].find(n=>n.nodeName==='value'); if(i&&i.firstElementChild)await parseWalkerAsync(i,fN(pP)||rT,fo,isC,p); } }
-    else if(cT==='DELETE'){ let t=fN(pP); if(t)t.isDeleted=true; }
+    } else if(cT==='INSERT'){ const w=x.getElementsByTagName('modelValueWrapper'); if(w.length>0&&w[0].firstElementChild){ let i=[...w[0].childNodes].find(n=>n.nodeName==='value'); if(i&&i.firstElementChild){ let t=fN(pP)||rT; t.modPaths.add(fo); await parseWalkerAsync(i,t,fo,isC,p,fo); } } }
+    else if(cT==='DELETE'){ let t=fN(pP); if(t){ t.isDeleted=true; t.modPaths.add(fo); } }
 }
 
 const normS=s=>(s||"").replace(/\s+/g,''), sortP=(a,b)=>{let i=ADITO_PROCESS_NAMES_ARR.indexOf(a), j=ADITO_PROCESS_NAMES_ARR.indexOf(b); return (i===-1?999:i)-(j===-1?999:j);};
@@ -375,14 +549,23 @@ function renderTree() {
     let eSub=document.createElement('div'); eSub.className='tree-sub'; let eHC=false, eHP=false;
     let ePNs=new Set([...Object.keys(eO?.procs||{}),...Object.keys(eM?.procs||{})]);
     if(ePNs.size>0){
-        let hId='hdr_entprocs', hdr=createUiRow(pI+1,'fa-cogs',`Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${ePNs.size}</span>`,'E',false,false,'#c9d1d9',hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+        let hId='hdr_entprocs', pCount = 0;
         let pSub=document.createElement('div'); pSub.className='tree-sub';
-        [...ePNs].sort(sortP).forEach(p=>{let st='E',op=eO?.procContents[p],mp=eM?.procContents[p]; if(!op&&mp){st='N';eHP=true;}else if(op&&!mp){st='D';eHP=true;}else if(normS(op)!==normS(mp)){st='C';eHP=true;} let pr=createUiRow(pI+2,'fa-code',p,st,eM?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',eO.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,eO?.procs[p],eM?.procs[p],eM,eO);}; pSub.appendChild(pr);});
-        hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(pSub);
+        [...ePNs].sort(sortP).forEach(p=>{
+            let st='E',op=eO?.procContents[p],mp=eM?.procContents[p]; 
+            if(!op&&!mp) return; 
+            pCount++;
+            if(!op&&mp){st='N';eHP=true;}else if(op&&!mp){st='D';eHP=true;}else if(normS(op)!==normS(mp)){st='C';eHP=true;} 
+            let pr=createUiRow(pI+2,'fa-code',p,st,eM?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',eO.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,eO?.procs[p],eM?.procs[p],eM,eO);}; pSub.appendChild(pr);
+        });
+        if (pCount > 0) {
+            let hdr=createUiRow(pI+1,'fa-cogs',`Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${pCount}</span>`,'E',false,false,'#c9d1d9',hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+            hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(pSub);
+        }
     }
     DESIGNER_ORDER.forEach(g=>{
         let oN=eO?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], mN=eM?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], aN=getUniq(oN,mN); if(!aN.length)return;
-        let cnf=UI_CONFIG[g]||{i:'fa-folder',c:'#8b949e',l:g}, hId='hdr_'+g, hdr=createUiRow(pI+1,cnf.i,`${cnf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${getDeepUniq(oN,mN)}</span>`,'E',false,false,cnf.c,hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+        let cnf=UI_CONFIG[g]||{i:'fa-folder',c:'#8b949e',l:g}, hId='hdr_'+g, hdr=createUiRow(pI+1,cnf.i,`${cnf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${getDeepUniq(oN,mN)}</span>`,'E',false,false,cnf.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
         let s=document.createElement('div'); s.className='tree-sub'; aN.sort((a,b)=>a.localeCompare(b)).forEach(n=>{let cW=createUiNode(findCI(oN,n),findCI(mN,n),pI+2), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')eHC=true; if(cSt==='P')eHP=true; s.appendChild(cW);});
         hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(s);
     });
@@ -393,7 +576,7 @@ function renderTree() {
         let cR=createUiRow(0,UI_CONFIG.neonContext.i,act.name,st,cM?.isCustom&&!isTpl,false,UI_CONFIG.neonContext.c,act.id,(!cM?.isCustom&&hasCustomModDescendant(cM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); cR.onclick=()=>{activateRow(cR);showProps(cO,cM);}; rW.appendChild(cR); pI=1;
     }
     let rR=createUiRow(pI,UI_CONFIG.entity.i,eO.name,eSt,eM?.isCustom&&!isTpl,false,UI_CONFIG.entity.c,eO.id,(!eM?.isCustom&&hasCustomModDescendant(eM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); rR.classList.add('no-children'); rR.onclick=()=>{activateRow(rR);showProps(eO,eM);}; rW.appendChild(rR); [...eSub.childNodes].forEach(n=>rW.appendChild(n)); cont.appendChild(rW);
-    if(vS.childNodes.length){ let vSt=vHC?'C':(vHP?'P':'E'), hId='hdr_views', hdr=createUiRow(pI,UI_CONFIG.neonView.i,`Views`,vSt,false,false,UI_CONFIG.neonView.c,hId); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed'); hdr.onclick=()=>hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(vS); }
+    if(vS.childNodes.length){ let vSt=vHC?'C':(vHP?'P':'E'), hId='hdr_views', hdr=createUiRow(pI,UI_CONFIG.neonView.i,`Views`,vSt,false,false,UI_CONFIG.neonView.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed'); hdr.onclick=()=>hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(vS); }
     if(state.treeState.activeId)document.querySelector(`[data-id="${state.treeState.activeId}"]`)?.click(); if(S('treeSearch')?.value)filterTree(S('treeSearch').value);
 }
 
@@ -406,99 +589,371 @@ function createUiNode(o,m,ind) {
     }
     let sub=document.createElement('div'); sub.className='tree-sub'; let cHc=false, cHp=false;
     [...new Set([...Object.keys(o?.procs||{}),...Object.keys(m?.procs||{})])].sort(sortP).forEach(p=>{
-        let pst='E',op=o?.procContents[p],mp=m?.procContents[p]; if(!op&&mp){pst='N';cHp=true;}else if(op&&!mp){pst='D';cHp=true;}else if(normS(op)!==normS(mp)){pst='C';cHp=true;}
+        let pst='E',op=o?.procContents[p],mp=m?.procContents[p]; 
+        if(!op&&!mp) return; 
+        if(!op&&mp){pst='N';cHp=true;}else if(op&&!mp){pst='D';cHp=true;}else if(normS(op)!==normS(mp)){pst='C';cHp=true;}
         let pr=createUiRow(ind+1,'fa-code',p,pst,m?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',act.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,o?.procs[p],m?.procs[p],m,o);}; sub.appendChild(pr);
     });
     getUniq(o?.children,m?.children).sort((a,b)=>a.localeCompare(b)).forEach(cn=>{let cW=createUiNode(findCI(o?.children,cn),findCI(m?.children,cn),ind+1), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')cHc=true; if(cSt==='P')cHp=true; sub.appendChild(cW);});
     if(st==='E'||st==='P'){if(cHc)st='C';else if(cHp&&st==='E')st='P';}
     let ex=(!m?.isCustom&&hasCustomModDescendant(m)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':"";
-    if(act.type==='neonView'){let r=(isTpl?projOrig:projMod)?.viewRoles?.[act.name]||(isTpl?projTemplate:projOrig)?.viewRoles?.[act.name]; if(r)ex+=`<span class="badge bg-primary ms-2" style="font-size:9px">${r}</span>`; let ref=new Set([...getRefsCI((isTpl?projTemplate:projOrig)?.viewRefs,act.name),...getRefsCI((isTpl?projOrig:projMod)?.viewRefs,act.name)]).size; if(ref)ex+=`<span class="badge bg-secondary ms-2" style="font-size:9px;border:1px solid #30363d;"><i class="fa-solid fa-link"></i> ${ref}</span>`;}
+    if(act.type==='neonView'){
+        let rSet = new Set([...((isTpl?projOrig:projMod)?.viewRoles?.[act.name] || []), ...((isTpl?projTemplate:projOrig)?.viewRoles?.[act.name] || [])]);
+        if(rSet.size) ex+=[...rSet].map(r=>`<span class="badge bg-primary ms-2" style="font-size:9px">${r}</span>`).join('');
+        let ref=new Set([...getRefsCI((isTpl?projTemplate:projOrig)?.viewRefs,act.name),...getRefsCI((isTpl?projOrig:projMod)?.viewRefs,act.name)]).size; if(ref)ex+=`<span class="badge bg-secondary ms-2" style="font-size:9px;border:1px solid #30363d;"><i class="fa-solid fa-link"></i> ${ref}</span>`;
+    }
     let cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'};
     let row=createUiRow(ind,cnf.i,act.name,st,m?.isCustom&&!isTpl,m?.isExt||o?.isExt,cnf.c,act.id,ex); if(!state.treeState.expanded.has(act.id))row.classList.add('collapsed');
     if(!sub.childNodes.length){row.classList.add('no-children'); row.onclick=()=>{activateRow(row);showProps(o,m);};} else row.onclick=e=>{if(e.target.classList.contains('toggle-icon')){e.stopPropagation();row.classList.toggle('collapsed');}else{activateRow(row);showProps(o,m);}};
     let w=document.createElement('div'); w.appendChild(row); w.appendChild(sub); return w;
 }
 
-function createUiRow(i,ic,t,st,c,e,col,id,ex=""){
+function createUiRow(i,ic,t,st,c,e,col,id,ex="", isHeader=false){
     let d=document.createElement('div'); d.className='tree-row'; d.style.paddingLeft=`${i*20+10}px`; if(id)d.dataset.id=id; d.dataset.st=st; d.dataset.name=t;
     let sC='transparent', bdr='none'; if(st==='N')sC='#3fb950';else if(st==='D')sC='#f85149';else if(st==='C')sC='#d29922';else if(st==='P')bdr='2px solid #d29922';else if(st==='E')bdr='1px solid #30363d';
-    d.innerHTML=`<i class="fa-solid fa-caret-down toggle-icon"></i><span class="status-dot" style="background:${sC};border:${bdr};"></span><i class="fa-solid ${ic} icon-col" style="color:${col};opacity:${st==='E'?'.6':'1'};"></i><span class="node-text" style="color:${st==='E'?'#8b949e':'#c9d1d9'};">${t} ${c?'<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>':''} ${e?'<span class="badge shadow-sm ms-1 text-dark" style="background-color:#ff79c6;font-size:9px">EXT</span>':''} ${ex}</span>`; return d;
+    let dotHtml = isHeader ? '' : `<span class="status-dot" style="background:${sC};border:${bdr};"></span>`;
+    d.innerHTML=`<i class="fa-solid fa-caret-down toggle-icon"></i>${dotHtml}<i class="fa-solid ${ic} icon-col" style="color:${col};opacity:${st==='E'?'.6':'1'};"></i><span class="node-text" style="color:${st==='E'?'#8b949e':'#c9d1d9'};">${t} ${c?'<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>':''} ${e?'<span class="badge shadow-sm ms-1 text-dark" style="background-color:#ff79c6;font-size:9px">EXT</span>':''} ${ex}</span>`; return d;
 }
 
 function toggleAllTree(ex){document.querySelectorAll('.tree-row:not(.no-children), .group-header').forEach(r=>r.classList.toggle('collapsed',!ex));}
 function activateRow(r){document.querySelectorAll('.tree-row').forEach(x=>x.classList.remove('active')); r.classList.add('active');}
 function setMode(m){state.currentMode=m;S('btn-mode-core').className=m==='core'?'btn btn-secondary fw-bold':'btn btn-outline-secondary';S('btn-mode-custom').className=m==='custom'?'btn btn-custom fw-bold':'btn btn-outline-secondary'; if(!S('props-view').classList.contains('d-none')){let a=document.querySelector('.tree-row.active');if(a&&a.dataset.id){let d=window._nodeRegistry[a.dataset.id];if(d)showProps(d.o,d.m);}}else if(!S('diff-view-container').classList.contains('d-none')){if(state.diffViewInfo)setDiffMode(m);}}
 
+function renderDebugMods(node, propName) {
+    let c = S('debug-mods-container'), l = S('debug-mods-list');
+    if(!node) { c.classList.add('d-none'); return; }
+    
+    let paths = new Set();
+    if (propName && node.modMap && node.modMap[propName]) {
+        node.modMap[propName].forEach(p => paths.add(p));
+    } else {
+        if(node.modPaths) node.modPaths.forEach(p => paths.add(p));
+        if(node.modMap) Object.values(node.modMap).forEach(set => set.forEach(p => paths.add(p)));
+    }
+    
+    if(paths.size === 0) {
+        c.classList.add('d-none');
+    } else {
+        c.classList.remove('d-none');
+        l.innerHTML = [...paths].map(fo => `
+            <div class="d-flex align-items-center mb-1">
+                <div class="text-custom font-monospace text-truncate flex-grow-1" style="font-size:11px;" title="${esc(fo.fullPath)}">
+                    <i class="fa-solid fa-wrench me-1"></i> $ADITOHOME/${esc(fo.path)}
+                </div>
+                <button class="btn btn-sm btn-outline-secondary py-0 ms-2 flex-shrink-0" style="font-size:10px;" onclick="copyText('${fo.fullPath.replace(/\\/g, '\\\\')}', this)"><i class="fa-solid fa-copy"></i></button>
+            </div>
+        `).join('');
+    }
+}
+
+function copyText(txt, btn) {
+    navigator.clipboard.writeText(txt);
+    let oH = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
+    btn.classList.add('border-success');
+    setTimeout(() => { btn.innerHTML = oH; btn.classList.remove('border-success'); }, 1500);
+}
+
+function toggleXmlView() {
+    let isXmlMode = !S('diff-view-container').classList.contains('d-none') && state.diffViewInfo?.isXml;
+    
+    if (isXmlMode) {
+        showProps(window.currentXmlNode.o, window.currentXmlNode.m);
+    } else {
+        S('btn-xml-view').innerHTML = `<i class="fa-solid fa-eye"></i> Visual Ansicht`;
+        S('btn-xml-view').classList.replace('btn-outline-secondary', 'btn-primary');
+        
+        let cO = window.currentXmlNode.o?.rawXml?.outerHTML || "";
+        let cM = window.currentXmlNode.m?.rawXml?.outerHTML || "";
+        let pN = "XML Definition";
+        
+        S('props-view').classList.add('d-none');
+        S('diff-view-container').classList.remove('d-none');
+        S('diff-view-container').classList.add('d-flex');
+        S('diff-toolbar').classList.remove('d-none');
+        S('diff-toolbar').classList.add('d-flex');
+        
+        state.diffViewInfo = {
+            origCode: cO, modCode: cM, sourceCode: cM, 
+            name: pN, pOrig: window.currentXmlNode.o?.file, pMod: window.currentXmlNode.m?.file, 
+            isCustomMod: window.currentXmlNode.m?.isCustom, targetNode: window.currentXmlNode.m, isXml: true
+        };
+        
+        S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pN}`;
+        S('debug-path-orig').textContent = state.diffViewInfo.pOrig?.path ? "$ADITOHOME/" + state.diffViewInfo.pOrig.path : "Nicht vorhanden";
+        S('debug-path-orig').dataset.full = state.diffViewInfo.pOrig?.fullPath || "";
+        S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
+        S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || "";
+        renderDebugMods(window.currentXmlNode.m || window.currentXmlNode.o, null);
+        setMode(state.currentMode);
+    }
+}
+
 function showProps(o, m){
-    S('props-view').classList.remove('d-none'); S('diff-view-container').classList.add('d-none'); S('diff-view-container').classList.remove('d-flex'); S('diff-toolbar').classList.add('d-none'); S('debug-banner').classList.add('d-none');
+    window.currentXmlNode = {o: o, m: m};
+    S('props-view').classList.remove('d-none'); S('diff-view-container').classList.add('d-none'); S('diff-view-container').classList.remove('d-flex'); S('diff-toolbar').classList.add('d-none'); 
+    
+    S('debug-banner').classList.toggle('d-none', !state.debugOpen);
+    
     let act=m||o, isT=state.compareMode==='template', cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'}, hasM=m&&(m.customProps.size>0||m.customProcs.size>0)&&!m.isCustom;
     S('mode-toggle').classList.toggle('d-none',!(hasM&&!isT)); S('view-title').innerHTML=`<i class="fa-solid ${cnf.i} me-2" style="color:${cnf.c}"></i> ${act.name} ${(act.isCustom&&!isT)?'<span class="badge badge-custom ms-2">CUSTOM</span>':''}`;
-    if(act.type==='neonView'){renderViews(o,m);return;}
-    const bT=(d,c,isM,rO,rM,t)=>{
-        let pt=PROP_DICTIONARY[t]||{groups:{},defaults:{}}, dfs=pt.defaults, rId=registerNodePair(rO,rM), eS=new Set([...Object.keys(d),...Object.keys(c)]); Object.values(pt.groups).flat().forEach(p=>eS.delete(p));
-        const rR=p=>{
-            let v=d[p],cv=c[p]; if(v===undefined&&cv===undefined)v=dfs[p]; let isS=d[p]!==undefined, dif=v!==cv&&(d[p]!==undefined||c[p]!==undefined), isP=ADITO_PROCESS_NAMES.has(p), vH=v!==undefined?esc(v):"";
-            let tA="", rH="prop-row", vC=isS?'#c9d1d9':'#6e7681';
-            if(isP&&isS){ let oC=rO?.procContents?.[p], mC=rM?((state.currentMode==='core'&&rM.coreProcContents.hasOwnProperty(p))?rM.coreProcContents[p]:rM.procContents[p]):undefined, bT='Identisch', bC='#8b949e', ic='fa-check'; if(oC&&!mC){bT='Entfernt';bC='#f85149';ic='fa-minus';}else if(!oC&&mC){bT='Neu';bC='#3fb950';ic='fa-plus';}else if(normS(oC)!==normS(mC)){bT='Geändert';bC='#d29922';ic='fa-pen';} vH=`<span class="badge" style="border:1px solid ${bC};color:${bC};"><i class="fa-solid ${ic}"></i> ${bT}</span>`; rH="prop-row-interactive"; tA=`onclick="window.triggerDiffFromProp('${rId}', '${p}')"`; vC=bC; }
-            let isCD=isM&&rM?.customProps.has(p)&&state.currentMode==='custom'&&!isT, bCl=dif&&!isP?(isCD?"subtle-diff-border-custom":"subtle-diff-border"):"", tCl=dif&&!isP?(isCD?'text-custom fw-bold':'text-warning fw-bold'):'';
-            return `<tr class="${rH}" ${tA}><td class="${bCl}" style="width:35%;border-color:#30363d;"><span style="color:${isS?'#e6edf3':'#6e7681'};font-weight:${isS?'600':'normal'};">${p}</span></td><td class="font-monospace text-break ${tCl}" style="border-color:#30363d;color:${dif&&!isP?'':vC};">${vH}</td></tr>`;
-        };
-        let h=""; for(const [g,pL] of Object.entries(pt.groups)){ h+=`<div class="prop-box"><div class="prop-box-header">${g}</div><table class="table table-sm m-0 bg-transparent"><tbody>${pL.map(rR).join('')}</tbody></table></div>`; }
-        if(eS.size>0) h+=`<div class="prop-box"><div class="prop-box-header">Extras</div><table class="table table-sm m-0 bg-transparent"><tbody>${[...eS].sort().map(rR).join('')}</tbody></table></div>`; return h||`<div class="text-secondary p-3">Keine Properties.</div>`;
+    
+    S('btn-debug-toggle').classList.remove('d-none');
+    S('debug-path-orig').textContent = o?.file?.path ? "$ADITOHOME/" + o.file.path : "Nicht vorhanden";
+    S('debug-path-orig').dataset.full = o?.file?.fullPath || "";
+    S('debug-path-mod').textContent = m?.file?.path ? "$ADITOHOME/" + m.file.path : "Nicht vorhanden";
+    S('debug-path-mod').dataset.full = m?.file?.fullPath || "";
+    renderDebugMods(act, null);
+
+    let hasXml = o?.rawXml || m?.rawXml;
+    S('btn-xml-view').classList.toggle('d-none', !hasXml);
+    S('btn-xml-view').innerHTML = `<i class="fa-solid fa-code"></i> XML Ansicht`;
+    if(S('btn-xml-view').classList.contains('btn-primary')) S('btn-xml-view').classList.replace('btn-primary', 'btn-outline-secondary');
+
+    let isNew = !o;
+    let isDeleted = (!m || m.isDeleted);
+    
+    let bMiss = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #f85149; border-left: 3px solid #f85149; background: rgba(248,81,73,0.05)!important;"><i class="fa-solid fa-minus-circle me-2" style="color:#f85149;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>NICHT VORHANDEN</b><span class="ms-2 text-secondary">Element existiert nicht oder wurde gelöscht.</span></span></div>`;
+    let bNew = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #3fb950; border-left: 3px solid #3fb950; background: rgba(63,185,80,0.05)!important;"><i class="fa-solid fa-plus-circle me-2" style="color:#3fb950;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>NEUES ELEMENT</b><span class="ms-2 text-secondary">Im Zielprojekt neu hinzugefügt.</span></span></div>`;
+    let bCust = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #9b59b6; border-left: 3px solid #9b59b6; background: rgba(142,68,173,0.05)!important;"><i class="fa-solid fa-wrench me-2" style="color:#d2a8ff;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>CUSTOM ELEMENT</b><span class="ms-2 text-secondary">Komplett neu als Modifikation angelegt.</span></span></div>`;
+
+    let bannerL = isNew ? bMiss : "";
+    let bannerR = isDeleted ? bMiss : (isNew ? ((act.isCustom && !isT) ? bCust : bNew) : "");
+
+    const formatVal = (v, p) => { 
+        if(v===undefined) return ''; 
+        if (p === 'dashletConfigurations' && v.includes(' | ')) {
+            return v.split('|||').map(d => {
+                let props = d.split(' | ');
+                let html = '<div class="card bg-dark border-secondary mb-2 shadow-sm" style="width:100%; overflow:hidden;"><div class="card-body p-2" style="font-size:11px; color:#c9d1d9; font-family:-apple-system,sans-serif;">';
+                props.forEach(pr => {
+                    let idx = pr.indexOf(': ');
+                    if (idx === -1) return;
+                    let k = pr.substring(0, idx);
+                    let val = pr.substring(idx + 2);
+                    if(k === 'name' || k === 'title') {
+                        html += `<div class="mb-1"><span class="text-info fw-bold">${esc(k)}:</span> <span class="text-light">${esc(val)}</span></div>`;
+                    } else {
+                        // Label starr (flex-shrink-0), Wert rechts daneben flüssig scrollbar (flex-grow-1, min-width:0)
+                        html += `<div class="mb-1 d-flex align-items-center" style="width: 100%;">
+                                    <span class="text-secondary fw-bold me-2 flex-shrink-0">${esc(k)}:</span>
+                                    <div class="custom-scroll-x pb-1" style="overflow-x: auto; white-space: nowrap; flex-grow: 1; min-width: 0;">${esc(val)}</div>
+                                 </div>`;
+                    }
+                });
+                html += '</div></div>';
+                return html;
+            }).join('');
+        }
+        let e = esc(v); 
+        return e.includes('|||') ? '<div class="d-flex flex-wrap gap-1">' + e.split('|||').map(x=>`<span class="badge bg-dark border border-secondary text-light fw-normal text-wrap text-start" style="font-size:10px; max-width:100%;">${x}</span>`).join('') + '</div>' : e; 
     };
-    let mP=m?(state.currentMode==='core'&&Object.keys(m.coreProps||{}).length>0?m.coreProps:m.props):{}, lN=isT?(window.projNameTpl||'Template Base'):(window.projNameOrig||'Original Base'), rN=isT?(window.projNameOrig||'Original Base'):(window.projNameMod||'Modular Target');
-    let f1=`<h6 style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">${lN}</h6>`, f2=`<h6 style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">${rN} ${state.currentMode==='core'&&hasM&&!isT?'(Core)':''}</h6>`;
-    if(!o&&(!m||m.isDeleted)){f1+=bT(mP,mP,true,o,m,act.type);} else if(!o){f1+=`<div class="alert alert-info bg-dark m-2 border-info"><i class="fa-solid fa-plus-circle"></i> Neu in Target.</div>`;f2+=bT(mP,mP,true,o,m,act.type);} else if(!m||m.isDeleted){f1+=bT(o.props,o.props,false,o,m,act.type);f2+=`<div class="alert alert-danger bg-dark m-2 border-danger"><i class="fa-solid fa-minus-circle"></i> Gelöscht.</div>`;} else {f1+=bT(o.props,mP,false,o,m,act.type);f2+=bT(mP,o.props,true,o,m,act.type);}
-    S('pane1').innerHTML=f1; S('pane2').innerHTML=f2;
+
+    const bT=(d,c,isM,rO,rM,t)=>{
+        let pt=PROP_DICTIONARY[t]||{groups:{},defaults:{}}, dfs=pt.defaults||{}, rId=registerNodePair(rO,rM), eS=new Set([...Object.keys(d),...Object.keys(c)]); Object.values(pt.groups).flat().forEach(p=>eS.delete(p));
+        const rR=p=>{
+            let v=d[p],cv=c[p]; if(v===undefined&&cv===undefined)v=dfs[p]; let isS=d[p]!==undefined, dif=v!==cv&&(d[p]!==undefined||c[p]!==undefined), isP=ADITO_PROCESS_NAMES.has(p);
+            let rH="prop-row", vC=isS?'#c9d1d9':'#6e7681', vH=formatVal(v, p);
+            let labelAttr = "", labelClass = "";
+            
+            if(isP&&isS){ 
+                let oC=rO?.procContents?.[p];
+                let mC=rM?((state.currentMode==='core'&&rM.coreProcContents.hasOwnProperty(p))?rM.coreProcContents[p]:rM.procContents[p]):undefined;
+                let isEmpty = !oC && !mC && (!v || v === "");
+
+                if (isEmpty) {
+                    vH = `<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;">
+                            <div class="text-muted small mt-1"><i class="fa-solid fa-ban text-secondary"></i> Nicht konfiguriert</div>
+                          </div>`;
+                    vC = "#6e7681";
+                } else {
+                    let bT='Gleich', bC='#8b949e', ic='fa-check'; 
+                    if(oC&&!mC){bT='Fehlt';bC='#f85149';ic='fa-minus';}else if(!oC&&mC){bT='Neu';bC='#3fb950';ic='fa-plus';}else if(normS(oC)!==normS(mC)){bT='Modifiziert';bC='#d2a8ff';ic='fa-pen';} 
+                    
+                    vH=`<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;">
+                            <div style="min-width:0; overflow-x:auto; white-space:nowrap; font-size:12px; opacity:0.9;" class="text-secondary custom-scroll-x pb-1 mt-1">${formatVal(v, p)}</div>
+                            <span class="badge flex-shrink-0 mt-1" style="border:1px solid ${bC};color:${bC};"><i class="fa-solid ${ic}"></i> ${bT}</span>
+                        </div>`; 
+                    vC=bC;
+                    
+                    labelClass = "prop-row-interactive";
+                    labelAttr = `onclick="window.triggerDiffFromProp('${rId}', '${p}')" title="Klicke für Diff-Ansicht"`;
+                }
+            }
+            
+            let isCD=isM&&rM?.customProps.has(p)&&state.currentMode==='custom'&&!isT, bCl=dif&&!isP?(isCD?"subtle-diff-border-custom":"subtle-diff-border"):"", tCl=dif&&!isP?(isCD?'text-custom fw-bold':'text-warning fw-bold'):'';
+            
+            // FIX: Das style="color:..." nutzt nun wieder streng isS?'#e6edf3':'#6e7681', ignoriert die Klickbarkeit
+            return `<tr class="${rH}">
+                        <td class="${bCl} ${labelClass}" ${labelAttr} style="width:35%;border-color:#30363d; transition: background 0.1s;">
+                            <span style="color:${isS?'#e6edf3':'#6e7681'};font-weight:${isS?'600':'normal'};">${p}</span>
+                        </td>
+                        <td class="font-monospace text-break ${tCl}" style="border-color:#30363d;color:${dif&&!isP?'':vC};">${vH}</td>
+                    </tr>`;
+        };
+        
+        let h=""; for(const [g,pL] of Object.entries(pt.groups)){ h+=`<div class="prop-box"><div class="prop-box-header">${g}</div><table class="table table-sm m-0 bg-transparent" style="table-layout: fixed; width: 100%;"><tbody>${pL.map(rR).join('')}</tbody></table></div>`; }
+        if(eS.size>0) h+=`<div class="prop-box"><div class="prop-box-header">Extras</div><table class="table table-sm m-0 bg-transparent" style="table-layout: fixed; width: 100%;"><tbody>${[...eS].sort().map(rR).join('')}</tbody></table></div>`; return h||`<div class="text-secondary p-3">Keine Properties.</div>`;
+    };
+    
+    let getP = n => {
+        if(!n) return {};
+        let isC = state.currentMode === 'core';
+        let prp = (isC && Object.keys(n.coreProps||{}).length > 0) ? n.coreProps : n.props;
+        let prc = (isC && Object.keys(n.coreProcs||{}).length > 0) ? n.coreProcs : n.procs;
+        return {...prp, ...prc};
+    };
+    let mP = getP(m);
+    let oP = getP(o);
+    
+    let lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=isT?(window.projNameOrig||'Original'):(window.projNameMod||'Modular');
+    
+    let f1HTML = "", f2HTML = "";
+    
+    if (isNew) {
+        f2HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, mP, true, o, m, act.type);
+    } else if (isDeleted) {
+        f1HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, oP, false, o, m, act.type);
+    } else {
+        f1HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, mP, false, o, m, act.type);
+        f2HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, oP, true, o, m, act.type);
+    }
+    
+    if(act.type==='neonView'){
+        renderViews(o,m,f1HTML,f2HTML, bannerL, bannerR, isNew, isDeleted, lN, rN);
+        return;
+    }
+
+    S('pane1').innerHTML = bannerL + (isNew ? "" : f1HTML); 
+    S('pane2').innerHTML = bannerR + (isDeleted ? "" : f2HTML);
 }
 
 let isSP1=false, isSP2=false; S('pane1').onscroll=()=>{if(!isSP1){isSP2=true;S('pane2').scrollTop=S('pane1').scrollTop;}isSP1=false;}; S('pane2').onscroll=()=>{if(!isSP2){isSP1=true;S('pane1').scrollTop=S('pane2').scrollTop;}isSP2=false;};
-function copyViewXml(s){navigator.clipboard.writeText(state.currentViewXml[s]||"");}
-function toggleAllTemplates(e){document.querySelectorAll('.view-tpl-table').forEach(t=>t.classList.toggle('d-none',!e)); document.querySelectorAll('.tpl-chevron').forEach(i=>i.classList.toggle('collapsed',!e));}
+function toggleAllTemplates(e, pId){document.querySelectorAll('#pane'+pId+' .view-tpl-table').forEach(t=>t.classList.toggle('d-none',!e)); document.querySelectorAll('#pane'+pId+' .tpl-chevron').forEach(i=>i.classList.toggle('collapsed',!e));}
 function toggleTemplate(id,cId){S(id).classList.toggle('d-none');S(cId).classList.toggle('collapsed');}
 
-function renderViews(o,m){
-    state.currentViewXml={1:o?.rawXml?.outerHTML||"",2:m?.rawXml?.outerHTML||""}; let act=m||o, isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, rs=new Set([...getRefsCI(pL?.viewRefs,act.name),...getRefsCI(pR?.viewRefs,act.name)]);
-    let rS=`<div class="prop-box mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">${rs.size?[...rs].sort().map(c=>`<span class="badge ${c.startsWith('Context:')?'bg-primary':'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''):'<span class="text-muted small">Keine Referenzen.</span>'}</div></div>`;
+function renderViews(o,m, f1HTML, f2HTML, bannerL, bannerR, isNew, isDeleted, lN, rN){
+    let act=m||o, isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, rs=new Set([...getRefsCI(pL?.viewRefs,act.name),...getRefsCI(pR?.viewRefs,act.name)]);
+    let rS=`<div class="prop-box mt-3 mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">${rs.size?[...rs].sort().map(c=>`<span class="badge ${c.startsWith('Context:')?'bg-primary':'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''):'<span class="text-muted small">Keine Referenzen.</span>'}</div></div>`;
+    
+    let cbLeft=`<div><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true, 1)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false, 1)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
+    let cbRight=`<div><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true, 2)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false, 2)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
+
     let oT=extractTemplates(o?.rawXml), mT=extractTemplates(m?.rawXml), oNm=[...new Set([...oT.order,...mT.order])];
+    const formatVal = v => { if(v===undefined) return ''; let e = esc(v); return e.includes('|||') ? e.split('|||').map(x=>`<span class="badge bg-dark border border-secondary text-light me-1 mb-1 fw-normal" style="font-size:10px;">${x}</span>`).join('') : e; };
     const bS=(tM,cM,s,isM,isC,nL)=>{
-        let h=`<div class="list-group list-group-flush rounded-1 border" style="border-color:#30363d!important;">`; if(!nL.length)return h+`<div class="p-3 text-muted small">Keine Templates</div></div>`;
+        let groups = { ROOT: [] };
         nL.forEach(tn=>{
+            let tl=getTplCI(tM.items,tn) || getTplCI(cM.items,tn);
+            let ep=tl?.extPoint || 'ROOT';
+            if(!groups[ep]) groups[ep] = [];
+            groups[ep].push(tn);
+        });
+
+        let h=`<div class="list-group list-group-flush rounded-1 border" style="border-color:#30363d!important;">`;
+        if(!nL.length)return h+`<div class="p-3 text-muted small">Keine Templates</div></div>`;
+
+        const renderItem = (tn, isExt)=>{
             let tl=getTplCI(tM.items,tn), ct=getTplCI(cM.items,tn), hid=Math.random().toString(36).substr(2,9), cId='tpl_'+s+'_'+hid, chId='chev_'+s+'_'+hid;
-            if(!tl){h+=`<div class="list-group-item p-2" style="background:#161b22;border-color:#30363d;opacity:.5;"><div class="text-danger fw-bold"><i class="fa-solid fa-minus"></i> Fehlt</div></div>`;return;}
-            let isR=tl.type==='neonViewReference', rb="", ic=isR?'fa-link':'fa-layer-group', tC=isR?'#8b949e':'#58a6ff', dif=!ct||JSON.stringify(tl.props)!==JSON.stringify(ct.props);
-            if(isR) rb=(pR?.contextViews.get(S('entitySelect').value.toLowerCase())?.has(tl.originalName)||pL?.contextViews.get(S('entitySelect').value.toLowerCase())?.has(tl.originalName))?`<span class="badge bg-dark border border-secondary text-secondary ms-2 fw-normal" style="font-size:9px;">Interne Referenz</span>`:`<span class="badge bg-dark border border-warning text-warning ms-2 fw-normal" style="font-size:9px;">Externe Referenz</span>`;
-            if(dif) tC=(isM&&isC?'#d2a8ff':'#d29922'); let tP=""; [...new Set([...Object.keys(tl.props),...Object.keys(ct?.props||{})])].sort().forEach(p=>{let v=tl.props[p],cv=ct?.props?.[p]; if(v===undefined&&isM)return; let d=v!==cv&&(v!==undefined&&cv!==undefined); tP+=`<tr><td class="${d?(isM&&isC?'subtle-diff-border-custom':'subtle-diff-border'):''}" style="width:30%;border-color:#30363d;color:#8b949e;">${p}</td><td class="font-monospace text-break ${d?(isM&&isC?'text-custom fw-bold':'text-warning fw-bold'):''}" style="border-color:#30363d;color:${v===undefined?'#6e7681':(d?'':'#c9d1d9')};">${v!==undefined?esc(v):''}</td></tr>`;});
-            h+=`<div class="list-group-item p-0 view-tpl-header" style="background:${isR?'#0d1117':'#161b22'};border-color:#30363d;"><div class="p-2 d-flex align-items-center" onclick="toggleTemplate('${cId}','${chId}')"><i id="${chId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i><div><div class="fw-bold" style="color:${tC}"><i class="fa-solid ${ic} me-1"></i> ${tn} ${rb}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${tl.type}</div></div></div><table id="${cId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px;background:#0d1117;"><tbody>${tP}</tbody></table></div>`;
-        }); return h+'</div>';
+            
+            if(!tl){ return `<div class="list-group-item p-2" style="background:#161b22;border-color:#30363d;opacity:.6;${isExt?'padding-left:32px!important;':''}"><div style="color:#e5534b; font-weight:600;"><i class="fa-solid fa-minus"></i> ${tn}</div></div>`; }
+            
+            let isR=tl.type==='neonViewReference', rb="", ic=isR?'fa-link':'fa-layer-group', tC='#8b949e', dif=!ct||JSON.stringify(tl.props)!==JSON.stringify(ct.props);
+            
+            if(isR) {
+                rb=`<span class="badge border text-primary ms-2 fw-normal" style="border-color: rgba(88,166,255,0.3)!important; background: rgba(88,166,255,0.1); font-size:9px;">Referenz</span>`;
+                tC='#8b949e'; 
+            } else {
+                if(!ct){
+                    tC='#79c0ff'; 
+                } else if(dif) {
+                    tC='#e3b341'; 
+                } else {
+                    tC='#8b949e'; 
+                }
+            }
+            
+            let tP=""; [...new Set([...Object.keys(tl.props),...Object.keys(ct?.props||{})])].sort().forEach(p=>{let v=tl.props[p],cv=ct?.props?.[p]; if(v===undefined&&isM)return; let d=v!==cv&&(v!==undefined&&cv!==undefined); tP+=`<tr><td class="${d?(isM&&isC?'subtle-diff-border-custom':'subtle-diff-border'):''}" style="width:30%;border-color:#30363d;color:#8b949e;">${p}</td><td class="font-monospace text-break ${d?(isM&&isC?'text-custom fw-bold':'text-warning fw-bold'):''}" style="border-color:#30363d;color:${v===undefined?'#6e7681':(d?'':'#c9d1d9')};">${formatVal(v)}</td></tr>`;});
+            return `<div class="list-group-item p-0 view-tpl-header" style="background:${isR?'#0d1117':'#161b22'};border-color:#30363d;"><div class="p-2 d-flex align-items-center" style="${isExt?'padding-left:32px!important;':''}" onclick="toggleTemplate('${cId}','${chId}')"><i id="${chId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i><div><div class="fw-bold" style="color:${tC}"><i class="fa-solid ${ic} me-1"></i> ${tn} ${rb}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${tl.type}</div></div></div><table id="${cId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px;background:#0d1117;"><tbody>${tP}</tbody></table></div>`;
+        };
+
+        groups.ROOT.forEach(tn=> h+=renderItem(tn, false));
+
+        Object.keys(groups).sort().forEach(ep=>{
+            if(ep==='ROOT') return;
+            h+=`<div class="list-group-item p-2 text-light fw-bold d-flex align-items-center" style="background:#21262d; border-color:#30363d; border-top:1px solid #30363d; font-size:11px;"><i class="fa-solid fa-puzzle-piece me-2" style="color:#ff79c6;"></i> <span class="text-truncate">${ep}</span> <span class="badge bg-dark border border-secondary text-secondary ms-auto fw-normal" style="font-size:9px;">EXTENSION POINT</span></div>`;
+            groups[ep].forEach(tn=> h+=renderItem(tn, true));
+        });
+
+        return h+'</div>';
     };
-    let cb=`<div class="mb-2"><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false)"><i class="fa-solid fa-compress"></i> Alle</button></div>`, lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=isT?(window.projNameOrig||'Original'):(window.projNameMod||'Modular'), oC="", mC="";
-    if(!o&&(!m||m.isDeleted)){oC=mC=bS(mT,mT,2,true,act.isCustom,oNm);} else if(!o){oC=`<div class="alert alert-info bg-dark m-2 border-info"><i class="fa-solid fa-plus-circle"></i> Neu.</div>`;mC=bS(mT,mT,2,true,act.isCustom,oNm);}else if(!m||m.isDeleted){oC=bS(oT,oT,1,false,false,oNm);mC=`<div class="alert alert-danger bg-dark m-2 border-danger"><i class="fa-solid fa-minus-circle"></i> Gelöscht.</div>`;}else{oC=bS(oT,mT,1,false,false,oNm);mC=bS(mT,oT,2,true,act.isCustom,oNm);}
-    S('pane1').innerHTML=rS+`<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${lN}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(1)"><i class="fa-solid fa-code"></i> XML</button></div>`+cb+oC; S('pane2').innerHTML=rS+`<div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e">${rN}</h6><button class="btn btn-sm btn-outline-secondary py-0" onclick="copyViewXml(2)"><i class="fa-solid fa-code"></i> XML</button></div>`+cb+mC;
+    
+    let oC="", mC="";
+    if(!isNew && !isDeleted) {
+        oC=bS(oT,mT,1,false,false,oNm);
+        mC=bS(mT,oT,2,true,act.isCustom,oNm);
+    } else if (isNew) {
+        mC=bS(mT,mT,2,true,act.isCustom,oNm);
+    } else if (isDeleted) {
+        oC=bS(oT,oT,1,false,false,oNm);
+    }
+
+    let leftContent = bannerL + (isNew ? "" : (rS + f1HTML + `<hr style="border-color:#30363d; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e;text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbLeft}</div>` + oC));
+    let rightContent = bannerR + (isDeleted ? "" : (rS + f2HTML + `<hr style="border-color:#30363d; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e;text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbRight}</div>` + mC));
+
+    S('pane1').innerHTML = leftContent;
+    S('pane2').innerHTML = rightContent;
 }
 
-function toggleDebugBanner(){S('debug-banner').classList.toggle('d-none');}
+function toggleDebugBanner(){
+    state.debugOpen = !state.debugOpen;
+    S('debug-banner').classList.toggle('d-none', !state.debugOpen);
+}
 function copyPath(s){let p=S('debug-path-'+s).textContent; if(p&&p!=='...')navigator.clipboard.writeText(p);}
 
 async function loadDiff(pN, pO, pM, tN, oN){
     S('props-view').classList.add('d-none'); S('diff-view-container').classList.remove('d-none'); S('diff-view-container').classList.add('d-flex'); S('diff-toolbar').classList.remove('d-none'); S('diff-toolbar').classList.add('d-flex');
     let isT=state.compareMode==='template'; S('view-title').innerHTML=`<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pN}`; S('diff-html-target').innerHTML='<div class="p-5 text-center text-primary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i></div>';
     let cO=oN?.procContents[pN]||"", cM=tN?.procContents[pN]||"", cS=tN?.coreProcContents[pN]||cM, isC=tN?.customProcs.has(pN)||false;
-    S('debug-path-orig').textContent=pO||"Nicht vorhanden"; state.diffViewInfo={origCode:cO,modCode:cM,sourceCode:cS,name:pN,pOrig:pO,pMod:pM,isCustomMod:isC,targetNode:tN};
+    
+    S('btn-debug-toggle').classList.remove('d-none');
+    S('debug-banner').classList.toggle('d-none', !state.debugOpen);
+    S('debug-path-orig').textContent = oN?.file?.path ? "$ADITOHOME/" + oN.file.path : "Nicht vorhanden";
+    S('debug-path-orig').dataset.full = oN?.file?.fullPath || "";
+    S('debug-path-mod').textContent = tN?.file?.path ? "$ADITOHOME/" + tN.file.path : "Nicht vorhanden";
+    S('debug-path-mod').dataset.full = tN?.file?.fullPath || "";
+    renderDebugMods(tN, pN);
+    
+    state.diffViewInfo={origCode:cO,modCode:cM,sourceCode:cS,name:pN,pOrig:oN?.file,pMod:tN?.file,isCustomMod:isC,targetNode:tN};
     S('mode-toggle').classList.toggle('d-none',!(isC&&!isT)); setMode((isC&&!isT)?'custom':'core');
 }
 
 async function reloadCurrentProcess(){
     if(state.diffViewInfo){ let isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, {name:n,pOrig:pO,pMod:pM,targetNode:tN}=state.diffViewInfo;
-        if(pO){let f=pL.findFile(pO); if(f)state.diffViewInfo.origCode=await pL.readText(f.fullPath);}
-        if(pM){let f=pR.findFile(pM); if(f){state.diffViewInfo.modCode=await pR.readText(f.fullPath); tN.procContents[n]=state.diffViewInfo.modCode;}} setDiffMode(state.currentMode);
+        if(pO){let f=pL.findFile(pO.path); if(f)state.diffViewInfo.origCode=await pL.readText(f.fullPath);}
+        if(pM){let f=pR.findFile(pM.path); if(f){state.diffViewInfo.modCode=await pR.readText(f.fullPath); tN.procContents[n]=state.diffViewInfo.modCode;}} setDiffMode(state.currentMode);
     }
 }
 
 async function setDiffMode(m){
     if(!state.diffViewInfo)return; let isT=state.compareMode==='template', lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=(isT?(window.projNameOrig||'Source'):(window.projNameMod||'Modular'))+(isT?"":(m==="custom"?" (Custom)":" (Core)"));
     let c1=state.diffViewInfo.origCode, c2=(m==='custom'&&!isT)?state.diffViewInfo.modCode:(isT?state.diffViewInfo.modCode:state.diffViewInfo.sourceCode);
-    S('debug-path-mod').textContent=((m==='custom'&&!isT)?state.diffViewInfo.pMod:(state.diffViewInfo.targetNode?.coreProcs?.[state.diffViewInfo.name]||state.diffViewInfo.pMod))||"Nicht vorhanden";
+    
+    if (m === 'custom' && !isT) {
+        let modF = state.diffViewInfo.targetNode?.modMap?.[state.diffViewInfo.name];
+        if (modF && modF.size > 0) {
+            let selectedMod = [...modF][0];
+            S('debug-path-mod').textContent = "$ADITOHOME/" + selectedMod.path;
+            S('debug-path-mod').dataset.full = selectedMod.fullPath;
+        } else {
+            S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
+            S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || "";
+        }
+    } else {
+        S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
+        S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || "";
+    }
+
     if(!c1&&c2){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-plus-circle"></i> Neu in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c2)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     if(c1&&!c2){S('diff-html-target').innerHTML=`<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger"><i class="fa-solid fa-minus-circle"></i> Entfernt in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     if(normS(c1)===normS(c2)&&c1!==""){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-check-circle"></i> Code ist identisch.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
@@ -521,6 +976,95 @@ async function setDiffMode(m){
 
 function copySource(id){ if(state.diffViewInfo){ let isT=state.compareMode==='template', m=S('btn-mode-custom').classList.contains('btn-custom')?'custom':'core', c=id===1?state.diffViewInfo.origCode:((m==='custom'&&!isT)?state.diffViewInfo.modCode:(isT?state.diffViewInfo.modCode:state.diffViewInfo.sourceCode)); navigator.clipboard.writeText(c); const b=S('copy-btn-'+id), oH=b.innerHTML; b.innerHTML='<i class="fa-solid fa-check"></i> Kopiert'; b.classList.add('text-success','border-success'); setTimeout(()=>{b.innerHTML=oH;b.classList.remove('text-success','border-success');},2000); } }
 S('resizer').onmousedown=()=>{document.onmousemove=e=>{S('pane1').style.flex=`0 0 ${Math.max(10,Math.min(90,((e.clientX-S('sidebar').offsetWidth)/S('content-view').offsetWidth)*100))}%`;}; document.onmouseup=()=>document.onmousemove=null;};
+
+/* --- CUSTOM STRG+F SEARCH --- */
+let searchData = { matches: [], current: -1, query: "" };
+
+document.addEventListener('keydown', e => {
+    if((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        S('custom-search-bar').classList.remove('d-none');
+        S('custom-search-input').focus();
+    } else if (e.key === 'Escape') {
+        closeSearch();
+    }
+});
+
+function closeSearch() {
+    S('custom-search-bar').classList.add('d-none');
+    S('custom-search-input').value = "";
+    clearHighlight();
+}
+
+function clearHighlight() {
+    document.querySelectorAll('mark.search-highlight').forEach(mark => {
+        let parent = mark.parentNode;
+        if(parent) {
+            parent.replaceChild(document.createTextNode(mark.textContent), mark);
+            parent.normalize();
+        }
+    });
+    searchData.matches = [];
+    searchData.current = -1;
+    S('custom-search-count').textContent = '0/0';
+}
+
+function handleSearch(q) {
+    clearHighlight();
+    if(!q) return;
+    searchData.query = q;
+    let isRegex = q.includes('%');
+    let pattern = isRegex ? q.replace(/%/g, '.*') : q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    let regex = new RegExp(pattern, 'gi');
+    
+    let target = S('content-view');
+    let textNodes = [];
+    let walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null, false);
+    while(walker.nextNode()) {
+        let p = walker.currentNode.parentNode;
+        if(p && p.nodeName !== 'SCRIPT' && p.nodeName !== 'STYLE' && !p.closest('#custom-search-bar') && !p.closest('.d-none')) {
+            textNodes.push(walker.currentNode);
+        }
+    }
+    
+    textNodes.forEach(node => {
+        let text = node.nodeValue;
+        let matches = [...text.matchAll(regex)];
+        if(matches.length > 0 && matches[0][0] !== "") {
+            let fragment = document.createDocumentFragment();
+            let lastIdx = 0;
+            matches.forEach(match => {
+                fragment.appendChild(document.createTextNode(text.substring(lastIdx, match.index)));
+                let mark = document.createElement('mark');
+                mark.className = 'search-highlight bg-warning text-dark rounded-1';
+                mark.textContent = match[0];
+                fragment.appendChild(mark);
+                searchData.matches.push(mark);
+                lastIdx = match.index + match[0].length;
+            });
+            fragment.appendChild(document.createTextNode(text.substring(lastIdx)));
+            if(node.parentNode) node.parentNode.replaceChild(fragment, node);
+        }
+    });
+    if(searchData.matches.length > 0) jumpSearch(1);
+    else S('custom-search-count').textContent = '0/0';
+}
+
+function jumpSearch(dir) {
+    if(searchData.matches.length === 0) return;
+    searchData.matches.forEach(m => { m.classList.remove('bg-info', 'text-white'); m.classList.add('bg-warning', 'text-dark'); });
+    
+    searchData.current += dir;
+    if(searchData.current >= searchData.matches.length) searchData.current = 0;
+    if(searchData.current < 0) searchData.current = searchData.matches.length - 1;
+    
+    let currentMark = searchData.matches[searchData.current];
+    currentMark.classList.remove('bg-warning', 'text-dark');
+    currentMark.classList.add('bg-info', 'text-white');
+    
+    currentMark.scrollIntoView({behavior: 'auto', block: 'center'});
+    S('custom-search-count').textContent = `${searchData.current + 1}/${searchData.matches.length}`;
+}
 </script>
 </body>
 </html>
