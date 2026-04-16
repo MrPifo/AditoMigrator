@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="de" data-bs-theme="dark">
 <head>
-<meta charset="UTF-8"><title>ADITO Migrator v1.8</title>
+<meta charset="UTF-8"><title id="app-window-title">ADITO Migrator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -71,12 +71,16 @@ body.template-mode header.main-header{background:linear-gradient(90deg,#5a1e22 0
 .d2h-code-wrapper{overflow:visible!important;width:max-content!important;min-width:100%;height:auto!important}
 .d2h-file-header,.d2h-file-list-wrapper,.d2h-file-name-wrapper,.d2h-icon,.d2h-tag{display:none!important}
 mark.search-highlight { padding: 0 2px; }
+.search-result-item { cursor: pointer; transition: background 0.1s; border-left: 3px solid transparent; }
+.search-result-item:hover, .search-result-item.active-item { background: rgba(56,139,253,.15); border-left-color: #58a6ff; }
+.search-highlight-text { background-color: rgba(227, 179, 65, 0.3); color: #e3b341; font-weight: bold; border-radius: 2px; padding: 0 2px; }
+.search-code-preview { font-family: var(--bs-font-monospace); font-size: 11px; color: #8b949e; white-space: pre-wrap; word-break: break-all; }
 </style>
 </head>
 <body>
 
 <header class="main-header d-flex align-items-center gap-2 p-2 border-bottom shadow-sm z-3" style="background:#161b22; border-color:#30363d!important; transition:background .3s, box-shadow .3s;">
-    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> ADITO Migrator v1.8</div>
+    <div class="fw-bold fs-6 me-3 text-white"><i class="fa-solid fa-bolt text-warning"></i> <span id="app-title-display">ADITO Migrator</span></div>
     <button id="btn-f1" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f1').click()"><i class="fa-regular fa-folder"></i> 1. Original</button>
     <button id="btn-f2" class="btn btn-sm btn-outline-secondary text-light text-truncate" style="max-width:250px;" onclick="S('f2').click()"><i class="fa-regular fa-folder"></i> 2. Modular</button>
     <button id="btn-f3" class="btn btn-sm btn-outline-secondary text-light ms-1 text-truncate" style="max-width:250px;" onclick="S('f3').click()"><i class="fa-regular fa-folder"></i> 3. Template</button>
@@ -180,27 +184,221 @@ mark.search-highlight { padding: 0 2px; }
         <div id="diff-view-container" class="d-none"><div id="diff-html-target" class="bg-dark"></div></div>
     </div>
 </main>
+<div id="quick-open-modal" class="d-none position-fixed top-0 start-0 w-100 h-100 z-3" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);">
+    <div class="container mt-5" style="max-width: 600px;">
+        <div class="card bg-dark border-secondary shadow-lg">
+            <div class="card-body p-2 d-flex align-items-center border-bottom border-secondary">
+                <i class="fa-solid fa-bolt text-warning me-2 ms-2"></i>
+                <input type="text" id="quick-open-input" class="form-control form-control-lg bg-transparent text-light border-0 shadow-none" placeholder="Quick Open... (z.B. %entity% oder ContextName)">
+                <span class="badge bg-secondary ms-2">ESC</span>
+            </div>
+            <div class="list-group list-group-flush" id="quick-open-results" style="max-height: 400px; overflow-y: auto;">
+                </div>
+        </div>
+    </div>
+</div>
+
+<div id="global-search-modal" class="d-none position-fixed top-0 start-0 w-100 h-100 z-3" style="background: rgba(0,0,0,0.7); backdrop-filter: blur(2px);">
+    <div class="container mt-5" style="max-width: 900px;">
+        <div class="card bg-dark border-secondary shadow-lg" style="height: 80vh; display: flex; flex-direction: column;">
+            <div class="card-body p-2 d-flex align-items-center border-bottom border-secondary flex-shrink-0">
+                <i class="fa-solid fa-search text-info me-2 ms-2"></i>
+                <input type="text" id="global-search-input" class="form-control form-control-lg bg-transparent text-light border-0 shadow-none" placeholder="Globale Suche in allen Dateien...">
+                <button class="btn btn-primary btn-sm ms-2" onclick="runGlobalSearch()"><i class="fa-solid fa-play"></i> Suchen</button>
+                <span class="badge bg-secondary ms-2">ESC</span>
+            </div>
+            <div class="p-2 text-secondary small border-bottom border-secondary flex-shrink-0 d-flex justify-content-between">
+                <span id="global-search-stats">Bereit.</span>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="search-regex" value="">
+                    <label class="form-check-label" for="search-regex">Regex aktivieren</label>
+                </div>
+            </div>
+            <div class="list-group list-group-flush flex-grow-1" id="global-search-results" style="overflow-y: auto;">
+                </div>
+        </div>
+    </div>
+</div>
 
 <script>
+/**
+ * ==============================================================================
+ * ADITO MIGRATOR CONFIGURATION
+ * ==============================================================================
+ * Hier können Pfade, Farben, Icons und andere hartcodierte Werte einfach 
+ * angepasst und erweitert werden.
+ * ==============================================================================
+ */
+const CONFIG = {
+    APP: {
+        VERSION: "1.9",
+        TITLE: "ADITO Migrator"
+    },
+    
+    // PFADE & SCAN-KONFIGURATION
+    SCAN_PATHS: {
+        // Erlaubte Ordner im Root-Verzeichnis (beschleunigt den Scan enorm)
+        ALLOWED_ROOT_FOLDERS: ['aliasdefinition', 'modification', 'neonview', 'process', 'entity', 'neoncontext', 'node_modules'],
+        // Scopes innerhalb von node_modules, die gescannt werden sollen
+        NODE_MODULES_SCOPES: ['@aditosoftware', '@adito-consulting', '@3hills-IT'], // Hier können weitere Scopes wie '@mycompany' ergänzt werden
+        // Generell ignorierte Ordner
+        IGNORED_FOLDERS: new Set(['dist', '.git', '.aditoprj', 'application', 'entitywebservice', 'language', 'neondashboard', 'others', 'preferences', 'scripts', 'system'])
+    },
+
+    // FARBPALETTE FÜR DIFFS UND UI
+    COLORS: {
+        NEW: '#3fb950',          // Grün (Neu)
+        MISSING: '#f85149',      // Rot (Fehlt / Gelöscht)
+        MODIFIED: '#d29922',     // Orange (Geändert)
+        CUSTOM: '#d2a8ff',       // Violett (Custom)
+        INFO: '#58a6ff',         // Blau (Info / Processes)
+        TEXT_LIGHT: '#c9d1d9',   // Heller Standardtext
+        TEXT_MUTED: '#8b949e',   // Gedimmter Text (Unverändert)
+        TEXT_DARKER: '#6e7681',  // Stark gedimmter Text
+        BG_DARK: '#161b22',      // Dunkler Hintergrund (Boxen)
+        BG_DARKER: '#0d1117',    // Sehr dunkler Hintergrund (Main)
+        BORDER: '#30363d',       // Standard Rahmenfarbe
+        TRANSPARENT: 'transparent'
+    },
+
+    // ADITO PROZESS-NAMEN & XML-STRUKTUREN
+    ADITO: {
+        PROCESS_NAMES: [
+			"titleProcess",
+			"linkedContextProcess",
+			"tooltipProcess",
+			"placeholderProcess",
+			"valueProcess",
+			"displayProcess",
+			"displayValueProcess",
+			"onValidation",
+			"onValueChange",
+			"dropDownProcess",
+			"colorProcess",
+			"stateProcess",
+			"mandatoryProcess",
+			"selectionModeProcess",
+			"contentTypeProcess",
+			"expression",
+			"iconProcess",
+			"onInit",
+			"afterUIiInit",
+			"beforeOperatingState",
+			"afterOperatingState",
+			"afterSave",
+			"initFilterProcess",
+			"contentTitleProcess",
+			"contentDescriptionProcess",
+			"grantCreateProcess",
+			"grantUpdateProcess",
+			"grantDeleteProcess",
+			"imageProcess",
+			"iconIdProcess",
+			"uniqueProviderKeyProcess",
+			"targetConsumerProcess",
+			"filterVariablesProcess",
+			"onActionProcess",
+			"process",
+			"filterConditionProcess",
+			"fromClauseProcess",
+			"conditionProcess",
+			"orderClauseProcess",
+			"onDBInsert",
+			"onDBUpdate",
+			"onDBDelete",
+			"filterFieldsProcess",
+			"filterValuesProcess",
+			"recordContainerProcess",
+			"contentProcess",
+			"groupQueryProcess",
+			"patternExtensionProcess",
+			"boostPatternProcess",
+			"defaultAction",
+			"rowCountProcess",
+			"onInsert",
+			"onUpdate",
+			"onDelete",
+			"cacheKeyProcess",
+			"titlePluralProcess",
+			"externalInitFilterProcess",
+			"documentation"
+		],
+        XML_WRAPPERS: ["entityFields","recordContainers","recordFieldMappings","implementations","children","filterExtensions"],
+        IGNORE_AS_PROPS: ["modelValueWrapper","stringValueWrapper"]
+    },
+
+    // UI NODE KONFIGURATION (Icons & Farben im Tree)
+    UI_NODES: {
+        neonContext: { i: 'fa-sitemap', c: '#f78166', l: 'Context' },
+        entity: { i: 'fa-database', c: '#fff', l: 'Entity' },
+        entityField: { i: 'fa-table-columns', c: '#58a6ff', l: 'Fields' },
+        entityConsumer: { i: 'fa-link', c: '#3fb950', l: 'Consumers' },
+        entityProvider: { i: 'fa-sign-out-alt', c: '#ff7b72', l: 'Providers' },
+        entityParameter: { i: 'fa-sliders', c: '#d2a8ff', l: 'Parameters' },
+        entityActionField: { i: 'fa-bolt', c: '#d29922', l: 'Actions' },
+        entityActionGroup: { i: 'fa-layer-group', c: '#d29922', l: 'Action Groups' },
+        entityServiceDefinition: { i: 'fa-cogs', c: '#8957e5', l: 'Services' },
+        recordContainer: { i: 'fa-server', c: '#e3b341', l: 'Record Containers' },
+        recordFieldMapping: { i: 'fa-database', c: '#a5d6ff', l: 'Mappings' },
+        filterExtension: { i: 'fa-filter', c: '#f0883e', l: 'Filter Extensions' },
+        ExtensionPoint: { i: 'fa-puzzle-piece', c: '#ff79c6', l: 'Extension Points' },
+        neonView: { i: 'fa-window-maximize', c: '#58a6ff', l: 'Views' },
+        serviceImplementation: { i: 'fa-cog', c: '#8957e5', l: 'Impls' },
+        default: { i: 'fa-cube', c: '#8b949e', l: 'Unknown' }
+    },
+
+    // SORTIER-REIHENFOLGE IM DESIGNER
+    DESIGNER_ORDER: [
+		'recordContainer',
+		'entityField',
+		'entityParameter',
+		'entityProvider',
+		'entityConsumer',
+		'entityActionField',
+		'entityActionGroup',
+		'entityServiceDefinition',
+		'filterExtension'
+	],
+
+    // PROPERTY DICTIONARY (Eigenschaften und Default-Werte)
+    PROPERTIES: {
+        entity: { groups: { "General": ["title","titlePlural","descriptionField","documentation","comment","metadata","useFavorites","recordRecipeSupported"], "Source": ["recordContainer"], "Processes": ["onInit","afterUIiInit","beforeOperatingState","afterOperatingState","onValidation","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess"], "Processes grants": ["usePermissions","grantCreate","grantCreateProcess","grantUpdate","grantUpdateProcess","grantDelete","grantDeleteProcess"], "Color": ["color","colorProcess"], "Icon": ["icon","iconProcess","image","imageProcess","iconId","iconIdProcess"] }, defaults: { useFavorites: "false", recordRecipeSupported: "false", usePermissions: "false", grantCreate: "true", grantUpdate: "true", grantDelete: "true" } },
+        entityField: { groups: { "General": ["name","title","titleProcess","descriptionField","documentation"], "Database": ["linkedContext","linkedContextProcess","consumer"], "Tool tip": ["tooltip","tooltipProcess"], "Placeholder": ["placeholder","placeholderProcess"], "Processes": ["valueProcess","displayValueProcess","onValidation","onValueChange","onValueChangeTypes","compareChangesWithRecordField"], "Value List": ["dropDownProcess","textInputAllowed"], "Processing grants": ["usePermissions"], "Color": ["color","colorProcess"], "Activity": ["state","stateProcess"], "Required field": ["mandatory","mandatoryProcess"], "Single selection": ["selectionMode","selectionModeProcess"], "Search": ["groupable","preferredGroupOrder"], "Content Type": ["contentType","contentTypeProcess"], "Formatting": ["maxFieldSize","resolution","outputFormat","inputFormat"] }, defaults: { state: "AUTO", mandatory: "false", selectionMode: "SINGLE", contentType: "TEXT", textInputAllowed: "false", usePermissions: "false", groupable: "false" } },
+        entityActionField: { groups: { "General": ["name","title","titleProcess","description","documentation"], "Tool tip": ["tooltip","tooltipProcess"], "Processing grants": ["usePermissions"], "Activity": ["state","stateProcess"], "Icon": ["iconId","iconIdProcess"], "Action": ["onActionProcess","shortcut","isMenuAction","isObjectAction","selectionType","isSaveAction"] }, defaults: { state: "EDITABLE", isMenuAction: "true", isObjectAction: "true", selectionType: "UNBOUND", usePermissions: "false" } },
+        entityActionGroup: { groups: { "General": ["name","title","titleProcess","description","documentation"], "Tool tip": ["tooltip","tooltipProcess"], "Activity": ["state","stateProcess"], "Icon": ["iconId","iconIdProcess"] } },
+        entityProvider: { groups: { "General": ["name","titlePlural","titlePluralProcess","description","documentation","dependencies","lookupIdfield","uniqueProviderKeyProcess"], "Source": ["recordcontainer","targetContextField","targetIdField","targetConsumerProcess","useAggregates","sortingField"], "Processing grants": ["usePermissions"], "Search": ["filterVariablesProcess","initFilterMergeMode"] }, defaults: { useAggregates: "false", usePermissions: "true", initFilterMergeMode: "AND" } },
+        entityConsumer: { groups: { "General": ["title","description","documentation","entityName","fieldName","refreshParent","isOneToOneRelationship"], "Processes": ["onValidation","externalInitFilterProcess"], "Activity": ["state","stateProcess"], "Single selection": ["selectionMode","selectionModeProcess"] }, defaults: { state: "EDITABLE", selectionMode: "SINGLE", refreshParent: "false", isOneToOneRelationship: "false" } },
+        entityParameter: { groups: { "General": ["name","description","documentation","title","valueProcess","expose","mandatory"] }, defaults: { expose: "false", mandatory: "false" } },
+        dbRecordContainer: { groups: { "General": ["title","type","description","documentation"], "Database": ["alias","linkInformation","maximumDbRows","isPageable","isReadOnly","isRequireContainerFiltering","hasDependentRecords","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete"] }, defaults: { type: "dbRecordContainer", isPageable: "true", isReadOnly: "false", isRequireContainerFiltering: "false", hasDependentRecords: "false" } },
+        jDitoRecordContainer: { groups: { "General": ["title","type","description","documentation"], "JDito": ["jDitoRecordAlias","recordFieldMappings","aggregateFieldMappings","isPageable","supportsFilterExtensionGrouping","isFilterable","isGroupable","isRequireContainerFiltering","isSortable","contentProcess","rowCountProcess","hasDependentRecords","onInsert","onUpdate","onDelete"], "Cache": ["cacheType","cacheKeyProcess"] }, defaults: { type: "jDitoRecordContainer", isPageable: "false", isFilterable: "false", isGroupable: "false", isRequireContainerFiltering: "false", isSortable: "false", hasDependentRecords: "false" } },
+        dbRecordFieldMapping: { groups: { "General": ["entityField","type","recordfield","expression","columnAlias"], "Search": ["isFilterable","isLookupFilter","maxFieldSize"] }, defaults: { isFilterable: "false", isLookupFilter: "false" } },
+        consumerMapping: { groups: { "General": ["type","filterConditionProcess"], "Search": ["filtertype","isFilterable","isLookupFilter"] }, defaults: { isFilterable: "false", isLookupFilter: "false" } },
+        filterExtension: { groups: { "General": ["type","documentation","title","isFilterable","contentType","useConsumer","consumer","filterValuesProcess","filterConditionProcess","groupedRecordField","titleRecordField","isGroupable","groupQueryProcess"], "Search": ["filtertype","isLookupfilter"] }, defaults: { isFilterable: "true", useConsumer: "false", isGroupable: "false", filtertype: "EXTENDED" } },
+        neonContext: { groups: { "General": ["title","devices","description","documentation","comment","icon","iconProcess"], "Entity": ["entity"], "Views": ["viewmodeProvider","mainView","filterView","editView","previewView","previewMultipleView","lookupView"] }, defaults: { devices: "MOBILE|TABLET|DESKTOP" } },
+        neonView: { groups: { "General": ["title","type","description","documentation","icon","iconProcess","quickEntry","filterable","size","isOverlay"], "Others": ["layout"] }, defaults: { filterable: "false", size: "NORMAL", isOverlay: "false" } },
+        entityServiceDefinition: { groups: { "General": ["name","documentation"] } },
+        serviceImplementation: { groups: { "General": ["name","process"] } }
+    }
+};
+
+// UI Initialization
+document.getElementById('app-window-title').textContent = `${CONFIG.APP.TITLE} v${CONFIG.APP.VERSION}`;
+document.getElementById('app-title-display').textContent = `${CONFIG.APP.TITLE} v${CONFIG.APP.VERSION}`;
+
+// Node & System Imports
 const fs=typeof require!=='undefined'?require('fs'):null, path=typeof require!=='undefined'?require('path'):null;
 const S=i=>document.getElementById(i), esc=u=>u?u.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"):"";
-window.projNameOrig=window.projNameMod=window.projNameTpl="";
 
-const IGNORED_FOLDERS = new Set([ 'dist', '.git', '.aditoprj', 'application', 'entitywebservice', 'language', 'neondashboard', 'others', 'preferences', 'scripts', 'system' ]);
+window.projNameOrig=window.projNameMod=window.projNameTpl="";
 
 const getUniq= (a,b)=>[...new Map([...(a||[]),...(b||[])].filter(x=>x&&x.name).map(x=>[x.name.toLowerCase(),x.name])).values()];
 const findCI=(a,n)=>n&&a?a.find(x=>x&&x.name&&x.name.toLowerCase()===n.toLowerCase()):undefined;
 const getTplCI=(m,n)=>n?m[Object.keys(m).find(k=>k.toLowerCase()===n.toLowerCase())]:undefined;
 const getRefsCI=(m,n)=>new Set(n?Object.keys(m).filter(k=>k.toLowerCase()===n.toLowerCase()).flatMap(k=>[...m[k]]):[]);
 
-const ADITO_PROCESS_NAMES_ARR=["titleProcess","linkedContextProcess","tooltipProcess","placeholderProcess","valueProcess","displayProcess","displayValueProcess","onValidation","onValueChange","dropDownProcess","colorProcess","stateProcess","mandatoryProcess","selectionModeProcess","contentTypeProcess","expression","iconProcess","onInit","afterUIiInit","beforeOperatingState","afterOperatingState","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess","grantCreateProcess","grantUpdateProcess","grantDeleteProcess","imageProcess","iconIdProcess","uniqueProviderKeyProcess","targetConsumerProcess","filterVariablesProcess","onActionProcess","process","filterConditionProcess","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete","filterFieldsProcess","filterValuesProcess","recordContainerProcess","contentProcess","groupQueryProcess","patternExtensionProcess","boostPatternProcess","defaultAction","rowCountProcess","onInsert","onUpdate","onDelete","cacheKeyProcess","titlePluralProcess","externalInitFilterProcess","documentation"];
-const ADITO_PROCESS_NAMES=new Set(ADITO_PROCESS_NAMES_ARR);
-const XML_WRAPPERS=new Set(["entityFields","recordContainers","recordFieldMappings","implementations","children","filterExtensions"]);
-const IGNORE_AS_PROPS=new Set([...XML_WRAPPERS,"modelValueWrapper","stringValueWrapper"]);
-
-const PROP_DICTIONARY={entity:{groups:{"General":["title","titlePlural","descriptionField","documentation","comment","metadata","useFavorites","recordRecipeSupported"],"Source":["recordContainer"],"Processes":["onInit","afterUIiInit","beforeOperatingState","afterOperatingState","onValidation","afterSave","initFilterProcess","contentTitleProcess","contentDescriptionProcess"],"Processes grants":["usePermissions","grantCreate","grantCreateProcess","grantUpdate","grantUpdateProcess","grantDelete","grantDeleteProcess"],"Color":["color","colorProcess"],"Icon":["icon","iconProcess","image","imageProcess","iconId","iconIdProcess"]},defaults:{useFavorites:"false",recordRecipeSupported:"false",usePermissions:"false",grantCreate:"true",grantUpdate:"true",grantDelete:"true"}},entityField:{groups:{"General":["name","title","titleProcess","descriptionField","documentation"],"Database":["linkedContext","linkedContextProcess","consumer"],"Tool tip":["tooltip","tooltipProcess"],"Placeholder":["placeholder","placeholderProcess"],"Processes":["valueProcess","displayValueProcess","onValidation","onValueChange","onValueChangeTypes","compareChangesWithRecordField"],"Value List":["dropDownProcess","textInputAllowed"],"Processing grants":["usePermissions"],"Color":["color","colorProcess"],"Activity":["state","stateProcess"],"Required field":["mandatory","mandatoryProcess"],"Single selection":["selectionMode","selectionModeProcess"],"Search":["groupable","preferredGroupOrder"],"Content Type":["contentType","contentTypeProcess"],"Formatting":["maxFieldSize","resolution","outputFormat","inputFormat"]},defaults:{state:"AUTO",mandatory:"false",selectionMode:"SINGLE",contentType:"TEXT",textInputAllowed:"false",usePermissions:"false",groupable:"false"}},entityActionField:{groups:{"General":["name","title","titleProcess","description","documentation"],"Tool tip":["tooltip","tooltipProcess"],"Processing grants":["usePermissions"],"Activity":["state","stateProcess"],"Icon":["iconId","iconIdProcess"],"Action":["onActionProcess","shortcut","isMenuAction","isObjectAction","selectionType","isSaveAction"]},defaults:{state:"EDITABLE",isMenuAction:"true",isObjectAction:"true",selectionType:"UNBOUND",usePermissions:"false"}},entityActionGroup:{groups:{"General":["name","title","titleProcess","description","documentation"],"Tool tip":["tooltip","tooltipProcess"],"Activity":["state","stateProcess"],"Icon":["iconId","iconIdProcess"]}},entityProvider:{groups:{"General":["name","titlePlural","titlePluralProcess","description","documentation","dependencies","lookupIdfield","uniqueProviderKeyProcess"],"Source":["recordcontainer","targetContextField","targetIdField","targetConsumerProcess","useAggregates","sortingField"],"Processing grants":["usePermissions"],"Search":["filterVariablesProcess","initFilterMergeMode"]},defaults:{useAggregates:"false",usePermissions:"true",initFilterMergeMode:"AND"}},entityConsumer:{groups:{"General":["title","description","documentation","entityName","fieldName","refreshParent","isOneToOneRelationship"],"Processes":["onValidation","externalInitFilterProcess"],"Activity":["state","stateProcess"],"Single selection":["selectionMode","selectionModeProcess"]},defaults:{state:"EDITABLE",selectionMode:"SINGLE",refreshParent:"false",isOneToOneRelationship:"false"}},entityParameter:{groups:{"General":["name","description","documentation","title","valueProcess","expose","mandatory"]},defaults:{expose:"false",mandatory:"false"}},dbRecordContainer:{groups:{"General":["title","type","description","documentation"],"Database":["alias","linkInformation","maximumDbRows","isPageable","isReadOnly","isRequireContainerFiltering","hasDependentRecords","fromClauseProcess","conditionProcess","orderClauseProcess","onDBInsert","onDBUpdate","onDBDelete"]},defaults:{type:"dbRecordContainer",isPageable:"true",isReadOnly:"false",isRequireContainerFiltering:"false",hasDependentRecords:"false"}},jDitoRecordContainer:{groups:{"General":["title","type","description","documentation"],"JDito":["jDitoRecordAlias","recordFieldMappings","aggregateFieldMappings","isPageable","supportsFilterExtensionGrouping","isFilterable","isGroupable","isRequireContainerFiltering","isSortable","contentProcess","rowCountProcess","hasDependentRecords","onInsert","onUpdate","onDelete"],"Cache":["cacheType","cacheKeyProcess"]},defaults:{type:"jDitoRecordContainer",isPageable:"false",isFilterable:"false",isGroupable:"false",isRequireContainerFiltering:"false",isSortable:"false",hasDependentRecords:"false"}},dbRecordFieldMapping:{groups:{"General":["entityField","type","recordfield","expression","columnAlias"],"Search":["isFilterable","isLookupFilter","maxFieldSize"]},defaults:{isFilterable:"false",isLookupFilter:"false"}},consumerMapping:{groups:{"General":["type","filterConditionProcess"],"Search":["filtertype","isFilterable","isLookupFilter"]},defaults:{isFilterable:"false",isLookupFilter:"false"}},filterExtension:{groups:{"General":["type","documentation","title","isFilterable","contentType","useConsumer","consumer","filterValuesProcess","filterConditionProcess","groupedRecordField","titleRecordField","isGroupable","groupQueryProcess"],"Search":["filtertype","isLookupfilter"]},defaults:{isFilterable:"true",useConsumer:"false",isGroupable:"false",filtertype:"EXTENDED"}},neonContext:{groups:{"General":["title","devices","description","documentation","comment","icon","iconProcess"],"Entity":["entity"],"Views":["viewmodeProvider","mainView","filterView","editView","previewView","previewMultipleView","lookupView"]},defaults:{devices:"MOBILE|TABLET|DESKTOP"}},neonView:{groups:{"General":["title","type","description","documentation","icon","iconProcess","quickEntry","filterable","size","isOverlay"],"Others":["layout"]},defaults:{filterable:"false",size:"NORMAL",isOverlay:"false"}},entityServiceDefinition:{groups:{"General":["name","documentation"]}},serviceImplementation:{groups:{"General":["name","process"]}}};
-const UI_CONFIG={neonContext:{i:'fa-sitemap',c:'#f78166',l:'Context'},entity:{i:'fa-database',c:'#fff',l:'Entity'},entityField:{i:'fa-table-columns',c:'#58a6ff',l:'Fields'},entityConsumer:{i:'fa-link',c:'#3fb950',l:'Consumers'},entityProvider:{i:'fa-sign-out-alt',c:'#ff7b72',l:'Providers'},entityParameter:{i:'fa-sliders',c:'#d2a8ff',l:'Parameters'},entityActionField:{i:'fa-bolt',c:'#d29922',l:'Actions'},entityActionGroup:{i:'fa-layer-group',c:'#d29922',l:'Action Groups'},entityServiceDefinition:{i:'fa-cogs',c:'#8957e5',l:'Services'},recordContainer:{i:'fa-server',c:'#e3b341',l:'Record Containers'},recordFieldMapping:{i:'fa-database',c:'#a5d6ff',l:'Mappings'},filterExtension:{i:'fa-filter',c:'#f0883e',l:'Filter Extensions'},ExtensionPoint:{i:'fa-puzzle-piece',c:'#ff79c6',l:'Extension Points'},neonView:{i:'fa-window-maximize',c:'#58a6ff',l:'Views'},serviceImplementation:{i:'fa-cog',c:'#8957e5',l:'Impls'}};
-const DESIGNER_ORDER=['recordContainer','entityField','entityParameter','entityProvider','entityConsumer','entityActionField','entityActionGroup','entityServiceDefinition','filterExtension'];
+const ADITO_PROCESS_NAMES=new Set(CONFIG.ADITO.PROCESS_NAMES);
+const XML_WRAPPERS=new Set(CONFIG.ADITO.XML_WRAPPERS);
+const IGNORE_AS_PROPS=new Set([...XML_WRAPPERS,...CONFIG.ADITO.IGNORE_AS_PROPS]);
 
 window._nodeRegistry={};
 function registerNodePair(o,m){let id=(m?.id||o?.id); window._nodeRegistry[id]={o,m}; return id;}
@@ -243,21 +441,21 @@ class AditoProject {
         }
     }
     
-    _walk(d, isNm = false) { 
+    _walk(d, isNm = false, depth = 0) { 
         try { 
             fs.readdirSync(d).forEach(f => {
                 let fp = path.join(d, f);
                 let fl = f.toLowerCase();
-                
                 if (fs.statSync(fp).isDirectory()) {
-                    if (IGNORED_FOLDERS.has(fl)) return;
+                    if (CONFIG.SCAN_PATHS.IGNORED_FOLDERS.has(fl)) return;
                     let nextIsNm = isNm;
-                    if (fl === 'node_modules') {
-                        nextIsNm = true;
+                    if(depth === 0) {
+                        if(!CONFIG.SCAN_PATHS.ALLOWED_ROOT_FOLDERS.includes(fl)) return;
+                        if(fl === 'node_modules') nextIsNm = true;
                     } else if (isNm && path.basename(d).toLowerCase() === 'node_modules') {
-                        if (fl !== '@aditosoftware') return;
+                        if (!CONFIG.SCAN_PATHS.NODE_MODULES_SCOPES.includes(fl)) return;
                     }
-                    this._walk(fp, nextIsNm);
+                    this._walk(fp, nextIsNm, depth + 1);
                 } else {
                     let rp = fp.substring(this.rootPath.length + 1).replace(/\\/g, '/');
                     this.files.set(rp.toLowerCase(), { path: rp, fullPath: fp });
@@ -293,29 +491,19 @@ function checkReady(){
     if(projOrig||projMod||projTemplate){
         const sel=S('entitySelect'); sel.innerHTML='<option value="">Context auswählen...</option>';
         const validContexts = new Map();
-        
         const checkEntity = (e) => {
             const ef = e.toLowerCase() + '.aod';
             return [projOrig, projMod, projTemplate].some(p => {
                 if(!p) return false;
-                for(const k of p.files.keys()) {
-                    if(k.endsWith('/' + ef) || k === ef) return true;
-                }
+                for(const k of p.files.keys()) { if(k.endsWith('/' + ef) || k === ef) return true; }
                 return false;
             });
         };
-
         [projOrig, projMod, projTemplate].forEach(p => {
             if(!p) return;
-            for(const [c, e] of p.contextToEntity) {
-                if(!validContexts.has(c) && checkEntity(e)) validContexts.set(c, e);
-            }
+            for(const [c, e] of p.contextToEntity) { if(!validContexts.has(c) && checkEntity(e)) validContexts.set(c, e); }
         });
-
-        [...validContexts.keys()].sort((a,b)=>a.localeCompare(b)).forEach(c => {
-            sel.add(new Option(c, validContexts.get(c))); 
-        });
-
+        [...validContexts.keys()].sort((a,b)=>a.localeCompare(b)).forEach(c => { sel.add(new Option(c, validContexts.get(c))); });
         sel.disabled=false; S('btn-analyze').disabled=false; S('btn-reload').classList.remove('d-none');
     }
     if(projOrig&&projTemplate) S('tpl-toggle-container').classList.remove('d-none');
@@ -349,7 +537,6 @@ function cloneNode(node) {
     if(!node) return null; let n=new TreeNode(node.name, node.type, node.file, node.id);
     n.props={...node.props}; n.coreProps={...node.coreProps}; n.procs={...node.procs}; n.coreProcs={...node.coreProcs}; n.procContents={...node.procContents}; n.coreProcContents={...node.coreProcContents};
     n.isCustom=node.isCustom; n.customProps=new Set(node.customProps); n.customProcs=new Set(node.customProcs); n.isDeleted=node.isDeleted; n.isExt=node.isExt; n.rawXml=node.rawXml; n.modPaths=new Set(node.modPaths);
-    
     n.modMap={}; for(let k in node.modMap) n.modMap[k]=new Set(node.modMap[k]);
     n.children=(node.children||[]).map(cloneNode); return n;
 }
@@ -415,16 +602,8 @@ async function buildData(p,eN) {
         if(k.includes(`/${eL}.aod`)||k.includes(`/${eL}/`)){ 
             const x=await p.readXml(fo.fullPath); 
             if(x){
-                if(x.nodeName==='entity'){
-                    res.entity.file=fo;
-                    res.entity.rawXml=x;
-                    await extractNodeDataAsync(x,res.entity,p);
-                    await parseWalkerAsync(x,res.entity,fo,false,p);
-                } else {
-                    const dum=x.ownerDocument.createElement('wrapper');
-                    dum.appendChild(x.cloneNode(true));
-                    await parseWalkerAsync(dum,res.entity,fo,false,p);
-                }
+                if(x.nodeName==='entity'){ res.entity.file=fo; res.entity.rawXml=x; await extractNodeDataAsync(x,res.entity,p); await parseWalkerAsync(x,res.entity,fo,false,p); }
+                else { const dum=x.ownerDocument.createElement('wrapper'); dum.appendChild(x.cloneNode(true)); await parseWalkerAsync(dum,res.entity,fo,false,p); }
             }
         }
         else if(cN&&k.includes(`neoncontext/${cN.toLowerCase()}.aod`)){ const x=await p.readXml(fo.fullPath); if(x){res.context=new TreeNode(cN,"neonContext",fo,'root_ctx'); res.context.rawXml=x; await extractNodeDataAsync(x,res.context,p);} }
@@ -436,34 +615,25 @@ async function buildData(p,eN) {
                 const isRootMod = !k.includes('node_modules/');
                 const x=await p.readXml(fo.fullPath); 
                 if(x){ 
-                    const mT=x.getElementsByTagName('modelName')[0]?.textContent; 
-                    const modType=x.getElementsByTagName('modelType')[0]?.textContent;
+                    const mT=x.getElementsByTagName('modelName')[0]?.textContent, modType=x.getElementsByTagName('modelType')[0]?.textContent;
                     if(mT){ 
                         let tV=findCI(res.views,mT);
                         if(tV && (modType==='neonView' || !modType)){
-                            tV.modPaths.add(fo);
-                            if(isRootMod) tV.isCustom = true;
-                            const cT=x.getElementsByTagName('changeType')[0]?.textContent;
-                            if(cT==='INSERT'){
+                            tV.modPaths.add(fo); if(isRootMod) tV.isCustom = true;
+                            if(x.getElementsByTagName('changeType')[0]?.textContent==='INSERT'){
                                 const w=x.getElementsByTagName('modelValueWrapper');
                                 if(w.length>0&&w[0].firstElementChild){
                                     let i=[...w[0].childNodes].find(n=>n.nodeName==='value');
                                     if(i&&i.firstElementChild){
                                         let targetChildren = tV.rawXml.getElementsByTagName('children')[0];
-                                        if(!targetChildren){
-                                            targetChildren = tV.rawXml.ownerDocument.createElement('children');
-                                            tV.rawXml.appendChild(targetChildren);
-                                        }
-                                        let clone = i.firstElementChild.cloneNode(true);
-                                        let pathText = x.getElementsByTagName('path')[0]?.textContent || "";
+                                        if(!targetChildren){ targetChildren = tV.rawXml.ownerDocument.createElement('children'); tV.rawXml.appendChild(targetChildren); }
+                                        let clone = i.firstElementChild.cloneNode(true), pathText = x.getElementsByTagName('path')[0]?.textContent || "";
                                         if(pathText.includes('ExtensionPoint')) clone.setAttribute('data-ext-path', pathText);
                                         targetChildren.appendChild(clone);
                                     }
                                 }
                             }
-                        } else if (mT.toLowerCase()===eL) {
-                            await applyModAsync(x,res.entity,fo,p); 
-                        } 
+                        } else if (mT.toLowerCase()===eL) { await applyModAsync(x,res.entity,fo,p); } 
                     } 
                 } 
             } 
@@ -478,38 +648,25 @@ async function extractNodeDataAsync(x,tN,p){
     for(let c of [...x.childNodes]){
         if(c.nodeType===1&&c.nodeName!=='name'&&!IGNORE_AS_PROPS.has(c.nodeName)){
             let v="", els=[...c.childNodes].filter(n=>n.nodeType===1&&n.nodeName==='element');
-            
-            if(els.length>0){
-                v=els.map(el=>el.textContent.trim()).join('|||');
-            } else if (c.nodeName === 'dashletConfigurations') {
+            if(els.length>0){ v=els.map(el=>el.textContent.trim()).join('|||'); } 
+            else if (c.nodeName === 'dashletConfigurations') {
                 let arr = [];
                 for(let d of c.children) {
                     let objProps = [];
                     for(let f of d.children) {
-                        if(f.children.length > 0 && f.nodeName !== 'name') {
-                            objProps.push(`${f.nodeName}: ` + [...f.children].map(cp=>cp.textContent).join(', '));
-                        } else {
-                            objProps.push(`${f.nodeName}: ${f.textContent.trim()}`);
-                        }
+                        if(f.children.length > 0 && f.nodeName !== 'name') objProps.push(`${f.nodeName}: ` + [...f.children].map(cp=>cp.textContent).join(', '));
+                        else objProps.push(`${f.nodeName}: ${f.textContent.trim()}`);
                     }
                     arr.push(objProps.join(' | '));
                 }
                 v = arr.join('|||');
-            } else if(c.firstElementChild) {
-                v=[...c.childNodes].filter(s=>s.nodeType===1&&s.nodeName!=='name').map(s=>`${s.nodeName}: ${s.textContent.trim()||s.getAttribute('v')||s.getAttribute('value')||""}`).join(' | ');
-            } else {
-                v=c.textContent.trim()||c.getAttribute('v')||c.getAttribute('value')||"";
-            }
+            } else if(c.firstElementChild) { v=[...c.childNodes].filter(s=>s.nodeType===1&&s.nodeName!=='name').map(s=>`${s.nodeName}: ${s.textContent.trim()||s.getAttribute('v')||s.getAttribute('value')||""}`).join(' | '); } 
+            else { v=c.textContent.trim()||c.getAttribute('v')||c.getAttribute('value')||""; }
             
             if(ADITO_PROCESS_NAMES.has(c.nodeName)){ 
                 tN.procs[c.nodeName]=v; 
-                if(v) {
-                    let f=(v==='process.js'||v==='./process.js')?[...p.files.values()].find(fl=>fl.fullPath===path.join(path.dirname(tN.file.fullPath),'process.js')):p.findFile(v); 
-                    if(f) tN.procContents[c.nodeName]=await p.readText(f.fullPath); 
-                }
-            } else {
-                tN.props[c.nodeName]=v;
-            }
+                if(v) { let f=(v==='process.js'||v==='./process.js')?[...p.files.values()].find(fl=>fl.fullPath===path.join(path.dirname(tN.file.fullPath),'process.js')):p.findFile(v); if(f) tN.procContents[c.nodeName]=await p.readText(f.fullPath); }
+            } else { tN.props[c.nodeName]=v; }
         }
     }
 }
@@ -536,7 +693,7 @@ async function applyModAsync(x,rT,fo,p){
     else if(cT==='DELETE'){ let t=fN(pP); if(t){ t.isDeleted=true; t.modPaths.add(fo); } }
 }
 
-const normS=s=>(s||"").replace(/\s+/g,''), sortP=(a,b)=>{let i=ADITO_PROCESS_NAMES_ARR.indexOf(a), j=ADITO_PROCESS_NAMES_ARR.indexOf(b); return (i===-1?999:i)-(j===-1?999:j);};
+const normS=s=>(s||"").replace(/\s+/g,''), sortP=(a,b)=>{let i=CONFIG.ADITO.PROCESS_NAMES.indexOf(a), j=CONFIG.ADITO.PROCESS_NAMES.indexOf(b); return (i===-1?999:i)-(j===-1?999:j);};
 const getDeepUniq=(o,m)=>{let u=new Set(); const t=a=>(a||[]).forEach(n=>{if(!n.isExt)u.add(n.name.toLowerCase());if(n.isExt&&n.children)t(n.children);}); t(o);t(m); return u.size;};
 
 function renderTree() {
@@ -556,16 +713,16 @@ function renderTree() {
             if(!op&&!mp) return; 
             pCount++;
             if(!op&&mp){st='N';eHP=true;}else if(op&&!mp){st='D';eHP=true;}else if(normS(op)!==normS(mp)){st='C';eHP=true;} 
-            let pr=createUiRow(pI+2,'fa-code',p,st,eM?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',eO.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,eO?.procs[p],eM?.procs[p],eM,eO);}; pSub.appendChild(pr);
+            let pr=createUiRow(pI+2,'fa-code',p,st,eM?.customProcs?.has(p)&&!isTpl,false,CONFIG.COLORS.INFO,eO.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,eO?.procs[p],eM?.procs[p],eM,eO);}; pSub.appendChild(pr);
         });
         if (pCount > 0) {
-            let hdr=createUiRow(pI+1,'fa-cogs',`Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${pCount}</span>`,'E',false,false,'#c9d1d9',hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+            let hdr=createUiRow(pI+1,'fa-cogs',`Entity Processes <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${pCount}</span>`,'E',false,false,CONFIG.COLORS.TEXT_LIGHT,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
             hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(pSub);
         }
     }
-    DESIGNER_ORDER.forEach(g=>{
+    CONFIG.DESIGNER_ORDER.forEach(g=>{
         let oN=eO?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], mN=eM?.children.filter(c=>c.type===g||(g==='recordContainer'&&c.type.endsWith('RecordContainer')))||[], aN=getUniq(oN,mN); if(!aN.length)return;
-        let cnf=UI_CONFIG[g]||{i:'fa-folder',c:'#8b949e',l:g}, hId='hdr_'+g, hdr=createUiRow(pI+1,cnf.i,`${cnf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${getDeepUniq(oN,mN)}</span>`,'E',false,false,cnf.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
+        let cnf=CONFIG.UI_NODES[g]||CONFIG.UI_NODES.default, hId='hdr_'+g, hdr=createUiRow(pI+1,cnf.i,`${cnf.l} <span class="badge bg-dark border text-light ms-2" style="font-size:10px">${getDeepUniq(oN,mN)}</span>`,'E',false,false,cnf.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed');
         let s=document.createElement('div'); s.className='tree-sub'; aN.sort((a,b)=>a.localeCompare(b)).forEach(n=>{let cW=createUiNode(findCI(oN,n),findCI(mN,n),pI+2), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')eHC=true; if(cSt==='P')eHP=true; s.appendChild(cW);});
         hdr.onclick=()=>hdr.classList.toggle('collapsed'); eSub.appendChild(hdr); eSub.appendChild(s);
     });
@@ -573,10 +730,10 @@ function renderTree() {
     if(cO||cM){
         let act=cM||cO, st='E'; if(!cO&&cM)st='N';else if(cO&&!cM)st='D';else{let oP={...cO?.props},mP={...cM?.props};if(ign){delete oP.title;delete mP.title;}if(JSON.stringify(oP)!==JSON.stringify(mP))st='C';}
         if(st==='E'||st==='P'){if(eSt==='C'||vHC)st='C';else if((eSt==='P'||vHP)&&st==='E')st='P';}
-        let cR=createUiRow(0,UI_CONFIG.neonContext.i,act.name,st,cM?.isCustom&&!isTpl,false,UI_CONFIG.neonContext.c,act.id,(!cM?.isCustom&&hasCustomModDescendant(cM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); cR.onclick=()=>{activateRow(cR);showProps(cO,cM);}; rW.appendChild(cR); pI=1;
+        let cR=createUiRow(0,CONFIG.UI_NODES.neonContext.i,act.name,st,cM?.isCustom&&!isTpl,false,CONFIG.UI_NODES.neonContext.c,act.id,(!cM?.isCustom&&hasCustomModDescendant(cM)&&!isTpl)?`<i class="fa-solid fa-wrench ms-2" style="color:${CONFIG.COLORS.CUSTOM};opacity:.8;font-size:10px;"></i>`:""); cR.onclick=()=>{activateRow(cR);showProps(cO,cM);}; rW.appendChild(cR); pI=1;
     }
-    let rR=createUiRow(pI,UI_CONFIG.entity.i,eO.name,eSt,eM?.isCustom&&!isTpl,false,UI_CONFIG.entity.c,eO.id,(!eM?.isCustom&&hasCustomModDescendant(eM)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':""); rR.classList.add('no-children'); rR.onclick=()=>{activateRow(rR);showProps(eO,eM);}; rW.appendChild(rR); [...eSub.childNodes].forEach(n=>rW.appendChild(n)); cont.appendChild(rW);
-    if(vS.childNodes.length){ let vSt=vHC?'C':(vHP?'P':'E'), hId='hdr_views', hdr=createUiRow(pI,UI_CONFIG.neonView.i,`Views`,vSt,false,false,UI_CONFIG.neonView.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed'); hdr.onclick=()=>hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(vS); }
+    let rR=createUiRow(pI,CONFIG.UI_NODES.entity.i,eO.name,eSt,eM?.isCustom&&!isTpl,false,CONFIG.UI_NODES.entity.c,eO.id,(!eM?.isCustom&&hasCustomModDescendant(eM)&&!isTpl)?`<i class="fa-solid fa-wrench ms-2" style="color:${CONFIG.COLORS.CUSTOM};opacity:.8;font-size:10px;"></i>`:""); rR.classList.add('no-children'); rR.onclick=()=>{activateRow(rR);showProps(eO,eM);}; rW.appendChild(rR); [...eSub.childNodes].forEach(n=>rW.appendChild(n)); cont.appendChild(rW);
+    if(vS.childNodes.length){ let vSt=vHC?'C':(vHP?'P':'E'), hId='hdr_views', hdr=createUiRow(pI,CONFIG.UI_NODES.neonView.i,`Views`,vSt,false,false,CONFIG.UI_NODES.neonView.c,hId,"", true); hdr.classList.add('group-header'); if(!state.treeState.expanded.has(hId))hdr.classList.add('collapsed'); hdr.onclick=()=>hdr.classList.toggle('collapsed'); cont.appendChild(hdr); cont.appendChild(vS); }
     if(state.treeState.activeId)document.querySelector(`[data-id="${state.treeState.activeId}"]`)?.click(); if(S('treeSearch')?.value)filterTree(S('treeSearch').value);
 }
 
@@ -592,17 +749,17 @@ function createUiNode(o,m,ind) {
         let pst='E',op=o?.procContents[p],mp=m?.procContents[p]; 
         if(!op&&!mp) return; 
         if(!op&&mp){pst='N';cHp=true;}else if(op&&!mp){pst='D';cHp=true;}else if(normS(op)!==normS(mp)){pst='C';cHp=true;}
-        let pr=createUiRow(ind+1,'fa-code',p,pst,m?.customProcs?.has(p)&&!isTpl,false,'#58a6ff',act.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,o?.procs[p],m?.procs[p],m,o);}; sub.appendChild(pr);
+        let pr=createUiRow(ind+1,'fa-code',p,pst,m?.customProcs?.has(p)&&!isTpl,false,CONFIG.COLORS.INFO,act.id+'_'+p,""); pr.classList.add('no-children'); pr.style.fontStyle='italic'; pr.onclick=e=>{e.stopPropagation();activateRow(pr);loadDiff(p,o?.procs[p],m?.procs[p],m,o);}; sub.appendChild(pr);
     });
     getUniq(o?.children,m?.children).sort((a,b)=>a.localeCompare(b)).forEach(cn=>{let cW=createUiNode(findCI(o?.children,cn),findCI(m?.children,cn),ind+1), cSt=cW.querySelector('.tree-row').dataset.st; if(cSt==='C'||cSt==='D'||cSt==='N')cHc=true; if(cSt==='P')cHp=true; sub.appendChild(cW);});
     if(st==='E'||st==='P'){if(cHc)st='C';else if(cHp&&st==='E')st='P';}
-    let ex=(!m?.isCustom&&hasCustomModDescendant(m)&&!isTpl)?'<i class="fa-solid fa-wrench ms-2" style="color:#d2a8ff;opacity:.8;font-size:10px;"></i>':"";
+    let ex=(!m?.isCustom&&hasCustomModDescendant(m)&&!isTpl)?`<i class="fa-solid fa-wrench ms-2" style="color:${CONFIG.COLORS.CUSTOM};opacity:.8;font-size:10px;"></i>`:"";
     if(act.type==='neonView'){
         let rSet = new Set([...((isTpl?projOrig:projMod)?.viewRoles?.[act.name] || []), ...((isTpl?projTemplate:projOrig)?.viewRoles?.[act.name] || [])]);
         if(rSet.size) ex+=[...rSet].map(r=>`<span class="badge bg-primary ms-2" style="font-size:9px">${r}</span>`).join('');
-        let ref=new Set([...getRefsCI((isTpl?projTemplate:projOrig)?.viewRefs,act.name),...getRefsCI((isTpl?projOrig:projMod)?.viewRefs,act.name)]).size; if(ref)ex+=`<span class="badge bg-secondary ms-2" style="font-size:9px;border:1px solid #30363d;"><i class="fa-solid fa-link"></i> ${ref}</span>`;
+        let ref=new Set([...getRefsCI((isTpl?projTemplate:projOrig)?.viewRefs,act.name),...getRefsCI((isTpl?projOrig:projMod)?.viewRefs,act.name)]).size; if(ref)ex+=`<span class="badge bg-secondary ms-2" style="font-size:9px;border:1px solid ${CONFIG.COLORS.BORDER};"><i class="fa-solid fa-link"></i> ${ref}</span>`;
     }
-    let cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'};
+    let cnf=act.isExt?CONFIG.UI_NODES.ExtensionPoint:CONFIG.UI_NODES[act.type]||CONFIG.UI_NODES.default;
     let row=createUiRow(ind,cnf.i,act.name,st,m?.isCustom&&!isTpl,m?.isExt||o?.isExt,cnf.c,act.id,ex); if(!state.treeState.expanded.has(act.id))row.classList.add('collapsed');
     if(!sub.childNodes.length){row.classList.add('no-children'); row.onclick=()=>{activateRow(row);showProps(o,m);};} else row.onclick=e=>{if(e.target.classList.contains('toggle-icon')){e.stopPropagation();row.classList.toggle('collapsed');}else{activateRow(row);showProps(o,m);}};
     let w=document.createElement('div'); w.appendChild(row); w.appendChild(sub); return w;
@@ -610,9 +767,9 @@ function createUiNode(o,m,ind) {
 
 function createUiRow(i,ic,t,st,c,e,col,id,ex="", isHeader=false){
     let d=document.createElement('div'); d.className='tree-row'; d.style.paddingLeft=`${i*20+10}px`; if(id)d.dataset.id=id; d.dataset.st=st; d.dataset.name=t;
-    let sC='transparent', bdr='none'; if(st==='N')sC='#3fb950';else if(st==='D')sC='#f85149';else if(st==='C')sC='#d29922';else if(st==='P')bdr='2px solid #d29922';else if(st==='E')bdr='1px solid #30363d';
+    let sC=CONFIG.COLORS.TRANSPARENT, bdr='none'; if(st==='N')sC=CONFIG.COLORS.NEW;else if(st==='D')sC=CONFIG.COLORS.MISSING;else if(st==='C')sC=CONFIG.COLORS.MODIFIED;else if(st==='P')bdr=`2px solid ${CONFIG.COLORS.MODIFIED}`;else if(st==='E')bdr=`1px solid ${CONFIG.COLORS.BORDER}`;
     let dotHtml = isHeader ? '' : `<span class="status-dot" style="background:${sC};border:${bdr};"></span>`;
-    d.innerHTML=`<i class="fa-solid fa-caret-down toggle-icon"></i>${dotHtml}<i class="fa-solid ${ic} icon-col" style="color:${col};opacity:${st==='E'?'.6':'1'};"></i><span class="node-text" style="color:${st==='E'?'#8b949e':'#c9d1d9'};">${t} ${c?'<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>':''} ${e?'<span class="badge shadow-sm ms-1 text-dark" style="background-color:#ff79c6;font-size:9px">EXT</span>':''} ${ex}</span>`; return d;
+    d.innerHTML=`<i class="fa-solid fa-caret-down toggle-icon"></i>${dotHtml}<i class="fa-solid ${ic} icon-col" style="color:${col};opacity:${st==='E'?'.6':'1'};"></i><span class="node-text" style="color:${st==='E'?CONFIG.COLORS.TEXT_MUTED:CONFIG.COLORS.TEXT_LIGHT};">${t} ${c?'<span class="badge badge-custom shadow-sm ms-2" style="font-size:9px">CUSTOM</span>':''} ${e?'<span class="badge shadow-sm ms-1 text-dark" style="background-color:#ff79c6;font-size:9px">EXT</span>':''} ${ex}</span>`; return d;
 }
 
 function toggleAllTree(ex){document.querySelectorAll('.tree-row:not(.no-children), .group-header').forEach(r=>r.classList.toggle('collapsed',!ex));}
@@ -656,30 +813,21 @@ function copyText(txt, btn) {
 
 function toggleXmlView() {
     let isXmlMode = !S('diff-view-container').classList.contains('d-none') && state.diffViewInfo?.isXml;
-    
     if (isXmlMode) {
         showProps(window.currentXmlNode.o, window.currentXmlNode.m);
     } else {
         S('btn-xml-view').innerHTML = `<i class="fa-solid fa-eye"></i> Visual Ansicht`;
         S('btn-xml-view').classList.replace('btn-outline-secondary', 'btn-primary');
-        
         let cO = window.currentXmlNode.o?.rawXml?.outerHTML || "";
         let cM = window.currentXmlNode.m?.rawXml?.outerHTML || "";
         let pN = "XML Definition";
-        
         S('props-view').classList.add('d-none');
         S('diff-view-container').classList.remove('d-none');
         S('diff-view-container').classList.add('d-flex');
         S('diff-toolbar').classList.remove('d-none');
         S('diff-toolbar').classList.add('d-flex');
-        
-        state.diffViewInfo = {
-            origCode: cO, modCode: cM, sourceCode: cM, 
-            name: pN, pOrig: window.currentXmlNode.o?.file, pMod: window.currentXmlNode.m?.file, 
-            isCustomMod: window.currentXmlNode.m?.isCustom, targetNode: window.currentXmlNode.m, isXml: true
-        };
-        
-        S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pN}`;
+        state.diffViewInfo = { origCode: cO, modCode: cM, sourceCode: cM, name: pN, pOrig: window.currentXmlNode.o?.file, pMod: window.currentXmlNode.m?.file, isCustomMod: window.currentXmlNode.m?.isCustom, targetNode: window.currentXmlNode.m, isXml: true };
+        S('view-title').innerHTML = `<i class="fa-solid fa-code me-2" style="color:${CONFIG.COLORS.INFO}"></i> Diff: ${pN}`;
         S('debug-path-orig').textContent = state.diffViewInfo.pOrig?.path ? "$ADITOHOME/" + state.diffViewInfo.pOrig.path : "Nicht vorhanden";
         S('debug-path-orig').dataset.full = state.diffViewInfo.pOrig?.fullPath || "";
         S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
@@ -692,12 +840,9 @@ function toggleXmlView() {
 function showProps(o, m){
     window.currentXmlNode = {o: o, m: m};
     S('props-view').classList.remove('d-none'); S('diff-view-container').classList.add('d-none'); S('diff-view-container').classList.remove('d-flex'); S('diff-toolbar').classList.add('d-none'); 
-    
     S('debug-banner').classList.toggle('d-none', !state.debugOpen);
-    
-    let act=m||o, isT=state.compareMode==='template', cnf=act.isExt?UI_CONFIG.ExtensionPoint:UI_CONFIG[act.type]||{i:'fa-cube',c:'#8b949e'}, hasM=m&&(m.customProps.size>0||m.customProcs.size>0)&&!m.isCustom;
+    let act=m||o, isT=state.compareMode==='template', cnf=act.isExt?CONFIG.UI_NODES.ExtensionPoint:CONFIG.UI_NODES[act.type]||CONFIG.UI_NODES.default, hasM=m&&(m.customProps.size>0||m.customProcs.size>0)&&!m.isCustom;
     S('mode-toggle').classList.toggle('d-none',!(hasM&&!isT)); S('view-title').innerHTML=`<i class="fa-solid ${cnf.i} me-2" style="color:${cnf.c}"></i> ${act.name} ${(act.isCustom&&!isT)?'<span class="badge badge-custom ms-2">CUSTOM</span>':''}`;
-    
     S('btn-debug-toggle').classList.remove('d-none');
     S('debug-path-orig').textContent = o?.file?.path ? "$ADITOHOME/" + o.file.path : "Nicht vorhanden";
     S('debug-path-orig').dataset.full = o?.file?.fullPath || "";
@@ -710,122 +855,66 @@ function showProps(o, m){
     S('btn-xml-view').innerHTML = `<i class="fa-solid fa-code"></i> XML Ansicht`;
     if(S('btn-xml-view').classList.contains('btn-primary')) S('btn-xml-view').classList.replace('btn-primary', 'btn-outline-secondary');
 
-    let isNew = !o;
-    let isDeleted = (!m || m.isDeleted);
-    
-    let bMiss = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #f85149; border-left: 3px solid #f85149; background: rgba(248,81,73,0.05)!important;"><i class="fa-solid fa-minus-circle me-2" style="color:#f85149;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>NICHT VORHANDEN</b><span class="ms-2 text-secondary">Element existiert nicht oder wurde gelöscht.</span></span></div>`;
-    let bNew = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #3fb950; border-left: 3px solid #3fb950; background: rgba(63,185,80,0.05)!important;"><i class="fa-solid fa-plus-circle me-2" style="color:#3fb950;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>NEUES ELEMENT</b><span class="ms-2 text-secondary">Im Zielprojekt neu hinzugefügt.</span></span></div>`;
-    let bCust = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #9b59b6; border-left: 3px solid #9b59b6; background: rgba(142,68,173,0.05)!important;"><i class="fa-solid fa-wrench me-2" style="color:#d2a8ff;"></i> <span style="color:#c9d1d9; font-size: 11px;"><b>CUSTOM ELEMENT</b><span class="ms-2 text-secondary">Komplett neu als Modifikation angelegt.</span></span></div>`;
+    let isNew = !o, isDeleted = (!m || m.isDeleted);
+    let bMiss = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid ${CONFIG.COLORS.MISSING}; border-left: 3px solid ${CONFIG.COLORS.MISSING}; background: rgba(248,81,73,0.05)!important;"><i class="fa-solid fa-minus-circle me-2" style="color:${CONFIG.COLORS.MISSING};"></i> <span style="color:${CONFIG.COLORS.TEXT_LIGHT}; font-size: 11px;"><b>NICHT VORHANDEN</b><span class="ms-2 text-secondary">Element existiert nicht oder wurde gelöscht.</span></span></div>`;
+    let bNew = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid ${CONFIG.COLORS.NEW}; border-left: 3px solid ${CONFIG.COLORS.NEW}; background: rgba(63,185,80,0.05)!important;"><i class="fa-solid fa-plus-circle me-2" style="color:${CONFIG.COLORS.NEW};"></i> <span style="color:${CONFIG.COLORS.TEXT_LIGHT}; font-size: 11px;"><b>NEUES ELEMENT</b><span class="ms-2 text-secondary">Im Zielprojekt neu hinzugefügt.</span></span></div>`;
+    let bCust = `<div class="alert bg-dark m-2 py-1 px-2 shadow-sm d-inline-flex align-items-center" style="border: 1px solid #9b59b6; border-left: 3px solid #9b59b6; background: rgba(142,68,173,0.05)!important;"><i class="fa-solid fa-wrench me-2" style="color:${CONFIG.COLORS.CUSTOM};"></i> <span style="color:${CONFIG.COLORS.TEXT_LIGHT}; font-size: 11px;"><b>CUSTOM ELEMENT</b><span class="ms-2 text-secondary">Komplett neu als Modifikation angelegt.</span></span></div>`;
 
-    let bannerL = isNew ? bMiss : "";
-    let bannerR = isDeleted ? bMiss : (isNew ? ((act.isCustom && !isT) ? bCust : bNew) : "");
+    let bannerL = isNew ? bMiss : "", bannerR = isDeleted ? bMiss : (isNew ? ((act.isCustom && !isT) ? bCust : bNew) : "");
 
     const formatVal = (v, p) => { 
         if(v===undefined) return ''; 
         if (p === 'dashletConfigurations' && v.includes(' | ')) {
             return v.split('|||').map(d => {
                 let props = d.split(' | ');
-                let html = '<div class="card bg-dark border-secondary mb-2 shadow-sm" style="width:100%; overflow:hidden;"><div class="card-body p-2" style="font-size:11px; color:#c9d1d9; font-family:-apple-system,sans-serif;">';
+                let html = `<div class="card bg-dark border-secondary mb-2 shadow-sm" style="width:100%; overflow:hidden;"><div class="card-body p-2" style="font-size:11px; color:${CONFIG.COLORS.TEXT_LIGHT}; font-family:-apple-system,sans-serif;">`;
                 props.forEach(pr => {
-                    let idx = pr.indexOf(': ');
-                    if (idx === -1) return;
-                    let k = pr.substring(0, idx);
-                    let val = pr.substring(idx + 2);
-                    if(k === 'name' || k === 'title') {
-                        html += `<div class="mb-1"><span class="text-info fw-bold">${esc(k)}:</span> <span class="text-light">${esc(val)}</span></div>`;
-                    } else {
-                        // Label starr (flex-shrink-0), Wert rechts daneben flüssig scrollbar (flex-grow-1, min-width:0)
-                        html += `<div class="mb-1 d-flex align-items-center" style="width: 100%;">
-                                    <span class="text-secondary fw-bold me-2 flex-shrink-0">${esc(k)}:</span>
-                                    <div class="custom-scroll-x pb-1" style="overflow-x: auto; white-space: nowrap; flex-grow: 1; min-width: 0;">${esc(val)}</div>
-                                 </div>`;
-                    }
+                    let idx = pr.indexOf(': '); if (idx === -1) return;
+                    let k = pr.substring(0, idx), val = pr.substring(idx + 2);
+                    if(k === 'name' || k === 'title') { html += `<div class="mb-1"><span class="text-info fw-bold">${esc(k)}:</span> <span class="text-light">${esc(val)}</span></div>`; }
+                    else { html += `<div class="mb-1 d-flex align-items-center" style="width: 100%;"><span class="text-secondary fw-bold me-2 flex-shrink-0">${esc(k)}:</span><div class="custom-scroll-x pb-1" style="overflow-x: auto; white-space: nowrap; flex-grow: 1; min-width: 0;">${esc(val)}</div></div>`; }
                 });
-                html += '</div></div>';
-                return html;
+                return html + '</div></div>';
             }).join('');
         }
-        let e = esc(v); 
-        return e.includes('|||') ? '<div class="d-flex flex-wrap gap-1">' + e.split('|||').map(x=>`<span class="badge bg-dark border border-secondary text-light fw-normal text-wrap text-start" style="font-size:10px; max-width:100%;">${x}</span>`).join('') + '</div>' : e; 
+        let e = esc(v); return e.includes('|||') ? '<div class="d-flex flex-wrap gap-1">' + e.split('|||').map(x=>`<span class="badge bg-dark border border-secondary text-light fw-normal text-wrap text-start" style="font-size:10px; max-width:100%;">${x}</span>`).join('') + '</div>' : e; 
     };
 
     const bT=(d,c,isM,rO,rM,t)=>{
-        let pt=PROP_DICTIONARY[t]||{groups:{},defaults:{}}, dfs=pt.defaults||{}, rId=registerNodePair(rO,rM), eS=new Set([...Object.keys(d),...Object.keys(c)]); Object.values(pt.groups).flat().forEach(p=>eS.delete(p));
+        let pt=CONFIG.PROPERTIES[t]||{groups:{},defaults:{}}, dfs=pt.defaults||{}, rId=registerNodePair(rO,rM), eS=new Set([...Object.keys(d),...Object.keys(c)]); Object.values(pt.groups).flat().forEach(p=>eS.delete(p));
         const rR=p=>{
             let v=d[p],cv=c[p]; if(v===undefined&&cv===undefined)v=dfs[p]; let isS=d[p]!==undefined, dif=v!==cv&&(d[p]!==undefined||c[p]!==undefined), isP=ADITO_PROCESS_NAMES.has(p);
-            let rH="prop-row", vC=isS?'#c9d1d9':'#6e7681', vH=formatVal(v, p);
-            let labelAttr = "", labelClass = "";
-            
+            let rH="prop-row", vC=isS?CONFIG.COLORS.TEXT_LIGHT:CONFIG.COLORS.TEXT_DARKER, vH=formatVal(v, p), labelAttr = "", labelClass = "";
             if(isP&&isS){ 
-                let oC=rO?.procContents?.[p];
-                let mC=rM?((state.currentMode==='core'&&rM.coreProcContents.hasOwnProperty(p))?rM.coreProcContents[p]:rM.procContents[p]):undefined;
-                let isEmpty = !oC && !mC && (!v || v === "");
-
-                if (isEmpty) {
-                    vH = `<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;">
-                            <div class="text-muted small mt-1"><i class="fa-solid fa-ban text-secondary"></i> Nicht konfiguriert</div>
-                          </div>`;
-                    vC = "#6e7681";
-                } else {
-                    let bT='Gleich', bC='#8b949e', ic='fa-check'; 
-                    if(oC&&!mC){bT='Fehlt';bC='#f85149';ic='fa-minus';}else if(!oC&&mC){bT='Neu';bC='#3fb950';ic='fa-plus';}else if(normS(oC)!==normS(mC)){bT='Modifiziert';bC='#d2a8ff';ic='fa-pen';} 
-                    
-                    vH=`<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;">
-                            <div style="min-width:0; overflow-x:auto; white-space:nowrap; font-size:12px; opacity:0.9;" class="text-secondary custom-scroll-x pb-1 mt-1">${formatVal(v, p)}</div>
-                            <span class="badge flex-shrink-0 mt-1" style="border:1px solid ${bC};color:${bC};"><i class="fa-solid ${ic}"></i> ${bT}</span>
-                        </div>`; 
-                    vC=bC;
-                    
-                    labelClass = "prop-row-interactive";
-                    labelAttr = `onclick="window.triggerDiffFromProp('${rId}', '${p}')" title="Klicke für Diff-Ansicht"`;
+                let oC=rO?.procContents?.[p], mC=rM?((state.currentMode==='core'&&rM.coreProcContents.hasOwnProperty(p))?rM.coreProcContents[p]:rM.procContents[p]):undefined, isEmpty = !oC && !mC && (!v || v === "");
+                if (isEmpty) { vH = `<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;"><div class="text-muted small mt-1"><i class="fa-solid fa-ban text-secondary"></i> Nicht konfiguriert</div></div>`; vC = CONFIG.COLORS.TEXT_DARKER; }
+                else {
+                    let bT='Gleich', bC=CONFIG.COLORS.TEXT_MUTED, ic='fa-check'; 
+                    if(oC&&!mC){bT='Fehlt';bC=CONFIG.COLORS.MISSING;ic='fa-minus';}else if(!oC&&mC){bT='Neu';bC=CONFIG.COLORS.NEW;ic='fa-plus';}else if(normS(oC)!==normS(mC)){bT='Modifiziert';bC=CONFIG.COLORS.CUSTOM;ic='fa-pen';} 
+                    vH=`<div class="d-flex justify-content-between align-items-start gap-2" style="min-height: 28px;"><div style="min-width:0; overflow-x:auto; white-space:nowrap; font-size:12px; opacity:0.9;" class="text-secondary custom-scroll-x pb-1 mt-1">${formatVal(v, p)}</div><span class="badge flex-shrink-0 mt-1" style="border:1px solid ${bC};color:${bC};"><i class="fa-solid ${ic}"></i> ${bT}</span></div>`; vC=bC;
+                    labelClass = "prop-row-interactive"; labelAttr = `onclick="window.triggerDiffFromProp('${rId}', '${p}')" title="Klicke für Diff-Ansicht"`;
                 }
             }
-            
             let isCD=isM&&rM?.customProps.has(p)&&state.currentMode==='custom'&&!isT, bCl=dif&&!isP?(isCD?"subtle-diff-border-custom":"subtle-diff-border"):"", tCl=dif&&!isP?(isCD?'text-custom fw-bold':'text-warning fw-bold'):'';
-            
-            // FIX: Das style="color:..." nutzt nun wieder streng isS?'#e6edf3':'#6e7681', ignoriert die Klickbarkeit
-            return `<tr class="${rH}">
-                        <td class="${bCl} ${labelClass}" ${labelAttr} style="width:35%;border-color:#30363d; transition: background 0.1s;">
-                            <span style="color:${isS?'#e6edf3':'#6e7681'};font-weight:${isS?'600':'normal'};">${p}</span>
-                        </td>
-                        <td class="font-monospace text-break ${tCl}" style="border-color:#30363d;color:${dif&&!isP?'':vC};">${vH}</td>
-                    </tr>`;
+            return `<tr class="${rH}"><td class="${bCl} ${labelClass}" ${labelAttr} style="width:35%;border-color:${CONFIG.COLORS.BORDER}; transition: background 0.1s;"><span style="color:${isS?'#e6edf3':CONFIG.COLORS.TEXT_DARKER};font-weight:${isS?'600':'normal'};">${p}</span></td><td class="font-monospace text-break ${tCl}" style="border-color:${CONFIG.COLORS.BORDER};color:${dif&&!isP?'':vC};">${vH}</td></tr>`;
         };
-        
         let h=""; for(const [g,pL] of Object.entries(pt.groups)){ h+=`<div class="prop-box"><div class="prop-box-header">${g}</div><table class="table table-sm m-0 bg-transparent" style="table-layout: fixed; width: 100%;"><tbody>${pL.map(rR).join('')}</tbody></table></div>`; }
         if(eS.size>0) h+=`<div class="prop-box"><div class="prop-box-header">Extras</div><table class="table table-sm m-0 bg-transparent" style="table-layout: fixed; width: 100%;"><tbody>${[...eS].sort().map(rR).join('')}</tbody></table></div>`; return h||`<div class="text-secondary p-3">Keine Properties.</div>`;
     };
     
     let getP = n => {
-        if(!n) return {};
-        let isC = state.currentMode === 'core';
-        let prp = (isC && Object.keys(n.coreProps||{}).length > 0) ? n.coreProps : n.props;
-        let prc = (isC && Object.keys(n.coreProcs||{}).length > 0) ? n.coreProcs : n.procs;
+        if(!n) return {}; let isC = state.currentMode === 'core';
+        let prp = (isC && Object.keys(n.coreProps||{}).length > 0) ? n.coreProps : n.props, prc = (isC && Object.keys(n.coreProcs||{}).length > 0) ? n.coreProcs : n.procs;
         return {...prp, ...prc};
     };
-    let mP = getP(m);
-    let oP = getP(o);
+    let mP = getP(m), oP = getP(o), lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=isT?(window.projNameOrig||'Original'):(window.projNameMod||'Modular'), f1HTML = "", f2HTML = "";
     
-    let lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=isT?(window.projNameOrig||'Original'):(window.projNameMod||'Modular');
+    if (isNew) { f2HTML = `<h6 class="ms-1 mt-3" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, mP, true, o, m, act.type); } 
+    else if (isDeleted) { f1HTML = `<h6 class="ms-1 mt-3" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, oP, false, o, m, act.type); } 
+    else { f1HTML = `<h6 class="ms-1 mt-3" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, mP, false, o, m, act.type); f2HTML = `<h6 class="ms-1 mt-3" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, oP, true, o, m, act.type); }
     
-    let f1HTML = "", f2HTML = "";
-    
-    if (isNew) {
-        f2HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, mP, true, o, m, act.type);
-    } else if (isDeleted) {
-        f1HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, oP, false, o, m, act.type);
-    } else {
-        f1HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${lN})</h6>` + bT(oP, mP, false, o, m, act.type);
-        f2HTML = `<h6 class="ms-1 mt-3" style="color:#8b949e;text-transform:uppercase;font-size:11px;margin-bottom:10px;">BASIS PROPERTIES (${rN} ${state.currentMode==='core'&&hasM&&!isT?'Core':''})</h6>` + bT(mP, oP, true, o, m, act.type);
-    }
-    
-    if(act.type==='neonView'){
-        renderViews(o,m,f1HTML,f2HTML, bannerL, bannerR, isNew, isDeleted, lN, rN);
-        return;
-    }
-
-    S('pane1').innerHTML = bannerL + (isNew ? "" : f1HTML); 
-    S('pane2').innerHTML = bannerR + (isDeleted ? "" : f2HTML);
+    if(act.type==='neonView'){ renderViews(o,m,f1HTML,f2HTML, bannerL, bannerR, isNew, isDeleted, lN, rN); return; }
+    S('pane1').innerHTML = bannerL + (isNew ? "" : f1HTML); S('pane2').innerHTML = bannerR + (isDeleted ? "" : f2HTML);
 }
 
 let isSP1=false, isSP2=false; S('pane1').onscroll=()=>{if(!isSP1){isSP2=true;S('pane2').scrollTop=S('pane1').scrollTop;}isSP1=false;}; S('pane2').onscroll=()=>{if(!isSP2){isSP1=true;S('pane1').scrollTop=S('pane2').scrollTop;}isSP2=false;};
@@ -834,96 +923,52 @@ function toggleTemplate(id,cId){S(id).classList.toggle('d-none');S(cId).classLis
 
 function renderViews(o,m, f1HTML, f2HTML, bannerL, bannerR, isNew, isDeleted, lN, rN){
     let act=m||o, isT=state.compareMode==='template', pL=isT?projTemplate:projOrig, pR=isT?projOrig:projMod, rs=new Set([...getRefsCI(pL?.viewRefs,act.name),...getRefsCI(pR?.viewRefs,act.name)]);
-    let rS=`<div class="prop-box mt-3 mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:#161b22;">${rs.size?[...rs].sort().map(c=>`<span class="badge ${c.startsWith('Context:')?'bg-primary':'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''):'<span class="text-muted small">Keine Referenzen.</span>'}</div></div>`;
-    
+    let rS=`<div class="prop-box mt-3 mb-3"><div class="prop-box-header text-info"><i class="fa-solid fa-link"></i> Referenziert von</div><div class="p-2" style="background:${CONFIG.COLORS.BG_DARK};">${rs.size?[...rs].sort().map(c=>`<span class="badge ${c.startsWith('Context:')?'bg-primary':'bg-secondary'} me-1 border border-secondary" style="font-size:11px;">${c}</span>`).join(''):'<span class="text-muted small">Keine Referenzen.</span>'}</div></div>`;
     let cbLeft=`<div><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true, 1)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false, 1)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
     let cbRight=`<div><button class="btn btn-sm btn-outline-secondary py-0 me-1" onclick="toggleAllTemplates(true, 2)"><i class="fa-solid fa-expand"></i> Alle</button><button class="btn btn-sm btn-outline-secondary py-0" onclick="toggleAllTemplates(false, 2)"><i class="fa-solid fa-compress"></i> Alle</button></div>`;
-
     let oT=extractTemplates(o?.rawXml), mT=extractTemplates(m?.rawXml), oNm=[...new Set([...oT.order,...mT.order])];
     const formatVal = v => { if(v===undefined) return ''; let e = esc(v); return e.includes('|||') ? e.split('|||').map(x=>`<span class="badge bg-dark border border-secondary text-light me-1 mb-1 fw-normal" style="font-size:10px;">${x}</span>`).join('') : e; };
     const bS=(tM,cM,s,isM,isC,nL)=>{
-        let groups = { ROOT: [] };
-        nL.forEach(tn=>{
-            let tl=getTplCI(tM.items,tn) || getTplCI(cM.items,tn);
-            let ep=tl?.extPoint || 'ROOT';
-            if(!groups[ep]) groups[ep] = [];
-            groups[ep].push(tn);
-        });
-
-        let h=`<div class="list-group list-group-flush rounded-1 border" style="border-color:#30363d!important;">`;
-        if(!nL.length)return h+`<div class="p-3 text-muted small">Keine Templates</div></div>`;
-
+        let groups = { ROOT: [] }; nL.forEach(tn=>{ let tl=getTplCI(tM.items,tn) || getTplCI(cM.items,tn), ep=tl?.extPoint || 'ROOT'; if(!groups[ep]) groups[ep] = []; groups[ep].push(tn); });
+        let h=`<div class="list-group list-group-flush rounded-1 border" style="border-color:${CONFIG.COLORS.BORDER}!important;">`; if(!nL.length)return h+`<div class="p-3 text-muted small">Keine Templates</div></div>`;
         const renderItem = (tn, isExt)=>{
             let tl=getTplCI(tM.items,tn), ct=getTplCI(cM.items,tn), hid=Math.random().toString(36).substr(2,9), cId='tpl_'+s+'_'+hid, chId='chev_'+s+'_'+hid;
-            
-            if(!tl){ return `<div class="list-group-item p-2" style="background:#161b22;border-color:#30363d;opacity:.6;${isExt?'padding-left:32px!important;':''}"><div style="color:#e5534b; font-weight:600;"><i class="fa-solid fa-minus"></i> ${tn}</div></div>`; }
-            
-            let isR=tl.type==='neonViewReference', rb="", ic=isR?'fa-link':'fa-layer-group', tC='#8b949e', dif=!ct||JSON.stringify(tl.props)!==JSON.stringify(ct.props);
-            
-            if(isR) {
-                rb=`<span class="badge border text-primary ms-2 fw-normal" style="border-color: rgba(88,166,255,0.3)!important; background: rgba(88,166,255,0.1); font-size:9px;">Referenz</span>`;
-                tC='#8b949e'; 
-            } else {
-                if(!ct){
-                    tC='#79c0ff'; 
-                } else if(dif) {
-                    tC='#e3b341'; 
-                } else {
-                    tC='#8b949e'; 
-                }
-            }
-            
-            let tP=""; [...new Set([...Object.keys(tl.props),...Object.keys(ct?.props||{})])].sort().forEach(p=>{let v=tl.props[p],cv=ct?.props?.[p]; if(v===undefined&&isM)return; let d=v!==cv&&(v!==undefined&&cv!==undefined); tP+=`<tr><td class="${d?(isM&&isC?'subtle-diff-border-custom':'subtle-diff-border'):''}" style="width:30%;border-color:#30363d;color:#8b949e;">${p}</td><td class="font-monospace text-break ${d?(isM&&isC?'text-custom fw-bold':'text-warning fw-bold'):''}" style="border-color:#30363d;color:${v===undefined?'#6e7681':(d?'':'#c9d1d9')};">${formatVal(v)}</td></tr>`;});
-            return `<div class="list-group-item p-0 view-tpl-header" style="background:${isR?'#0d1117':'#161b22'};border-color:#30363d;"><div class="p-2 d-flex align-items-center" style="${isExt?'padding-left:32px!important;':''}" onclick="toggleTemplate('${cId}','${chId}')"><i id="${chId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i><div><div class="fw-bold" style="color:${tC}"><i class="fa-solid ${ic} me-1"></i> ${tn} ${rb}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${tl.type}</div></div></div><table id="${cId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px;background:#0d1117;"><tbody>${tP}</tbody></table></div>`;
+            if(!tl){ return `<div class="list-group-item p-2" style="background:${CONFIG.COLORS.BG_DARK};border-color:${CONFIG.COLORS.BORDER};opacity:.6;${isExt?'padding-left:32px!important;':''}"><div style="color:#e5534b; font-weight:600;"><i class="fa-solid fa-minus"></i> ${tn}</div></div>`; }
+            let isR=tl.type==='neonViewReference', rb="", ic=isR?'fa-link':'fa-layer-group', tC=CONFIG.COLORS.TEXT_MUTED, dif=!ct||JSON.stringify(tl.props)!==JSON.stringify(ct.props);
+            if(isR) { rb=`<span class="badge border text-primary ms-2 fw-normal" style="border-color: rgba(88,166,255,0.3)!important; background: rgba(88,166,255,0.1); font-size:9px;">Referenz</span>`; tC=CONFIG.COLORS.TEXT_MUTED; } 
+            else { if(!ct) tC='#79c0ff'; else if(dif) tC='#e3b341'; else tC=CONFIG.COLORS.TEXT_MUTED; }
+            let tP=""; [...new Set([...Object.keys(tl.props),...Object.keys(ct?.props||{})])].sort().forEach(p=>{let v=tl.props[p],cv=ct?.props?.[p]; if(v===undefined&&isM)return; let d=v!==cv&&(v!==undefined&&cv!==undefined); tP+=`<tr><td class="${d?(isM&&isC?'subtle-diff-border-custom':'subtle-diff-border'):''}" style="width:30%;border-color:${CONFIG.COLORS.BORDER};color:${CONFIG.COLORS.TEXT_MUTED};">${p}</td><td class="font-monospace text-break ${d?(isM&&isC?'text-custom fw-bold':'text-warning fw-bold'):''}" style="border-color:${CONFIG.COLORS.BORDER};color:${v===undefined?CONFIG.COLORS.TEXT_DARKER:(d?'':CONFIG.COLORS.TEXT_LIGHT)};">${formatVal(v)}</td></tr>`;});
+            return `<div class="list-group-item p-0 view-tpl-header" style="background:${isR?CONFIG.COLORS.BG_DARKER:CONFIG.COLORS.BG_DARK};border-color:${CONFIG.COLORS.BORDER};"><div class="p-2 d-flex align-items-center" style="${isExt?'padding-left:32px!important;':''}" onclick="toggleTemplate('${cId}','${chId}')"><i id="${chId}" class="fa-solid fa-chevron-down tpl-chevron collapsed me-2 text-secondary"></i><div><div class="fw-bold" style="color:${tC}"><i class="fa-solid ${ic} me-1"></i> ${tn} ${rb}</div><div class="small text-secondary font-monospace" style="font-size:10px;">${tl.type}</div></div></div><table id="${cId}" class="table table-sm table-dark d-none m-0 view-tpl-table" style="font-size:11px;background:${CONFIG.COLORS.BG_DARKER};"><tbody>${tP}</tbody></table></div>`;
         };
-
         groups.ROOT.forEach(tn=> h+=renderItem(tn, false));
-
         Object.keys(groups).sort().forEach(ep=>{
             if(ep==='ROOT') return;
-            h+=`<div class="list-group-item p-2 text-light fw-bold d-flex align-items-center" style="background:#21262d; border-color:#30363d; border-top:1px solid #30363d; font-size:11px;"><i class="fa-solid fa-puzzle-piece me-2" style="color:#ff79c6;"></i> <span class="text-truncate">${ep}</span> <span class="badge bg-dark border border-secondary text-secondary ms-auto fw-normal" style="font-size:9px;">EXTENSION POINT</span></div>`;
+            h+=`<div class="list-group-item p-2 text-light fw-bold d-flex align-items-center" style="background:#21262d; border-color:${CONFIG.COLORS.BORDER}; border-top:1px solid ${CONFIG.COLORS.BORDER}; font-size:11px;"><i class="fa-solid fa-puzzle-piece me-2" style="color:#ff79c6;"></i> <span class="text-truncate">${ep}</span> <span class="badge bg-dark border border-secondary text-secondary ms-auto fw-normal" style="font-size:9px;">EXTENSION POINT</span></div>`;
             groups[ep].forEach(tn=> h+=renderItem(tn, true));
         });
-
         return h+'</div>';
     };
     
     let oC="", mC="";
-    if(!isNew && !isDeleted) {
-        oC=bS(oT,mT,1,false,false,oNm);
-        mC=bS(mT,oT,2,true,act.isCustom,oNm);
-    } else if (isNew) {
-        mC=bS(mT,mT,2,true,act.isCustom,oNm);
-    } else if (isDeleted) {
-        oC=bS(oT,oT,1,false,false,oNm);
-    }
-
-    let leftContent = bannerL + (isNew ? "" : (rS + f1HTML + `<hr style="border-color:#30363d; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e;text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbLeft}</div>` + oC));
-    let rightContent = bannerR + (isDeleted ? "" : (rS + f2HTML + `<hr style="border-color:#30363d; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:#8b949e;text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbRight}</div>` + mC));
-
-    S('pane1').innerHTML = leftContent;
-    S('pane2').innerHTML = rightContent;
+    if(!isNew && !isDeleted) { oC=bS(oT,mT,1,false,false,oNm); mC=bS(mT,oT,2,true,act.isCustom,oNm); } 
+    else if (isNew) { mC=bS(mT,mT,2,true,act.isCustom,oNm); } 
+    else if (isDeleted) { oC=bS(oT,oT,1,false,false,oNm); }
+    let leftContent = bannerL + (isNew ? "" : (rS + f1HTML + `<hr style="border-color:${CONFIG.COLORS.BORDER}; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbLeft}</div>` + oC));
+    let rightContent = bannerR + (isDeleted ? "" : (rS + f2HTML + `<hr style="border-color:${CONFIG.COLORS.BORDER}; margin: 15px 0 10px 0;"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="m-0" style="color:${CONFIG.COLORS.TEXT_MUTED};text-transform:uppercase;font-size:11px;">TEMPLATES</h6>${cbRight}</div>` + mC));
+    S('pane1').innerHTML = leftContent; S('pane2').innerHTML = rightContent;
 }
 
-function toggleDebugBanner(){
-    state.debugOpen = !state.debugOpen;
-    S('debug-banner').classList.toggle('d-none', !state.debugOpen);
-}
+function toggleDebugBanner(){ state.debugOpen = !state.debugOpen; S('debug-banner').classList.toggle('d-none', !state.debugOpen); }
 function copyPath(s){let p=S('debug-path-'+s).textContent; if(p&&p!=='...')navigator.clipboard.writeText(p);}
 
 async function loadDiff(pN, pO, pM, tN, oN){
     S('props-view').classList.add('d-none'); S('diff-view-container').classList.remove('d-none'); S('diff-view-container').classList.add('d-flex'); S('diff-toolbar').classList.remove('d-none'); S('diff-toolbar').classList.add('d-flex');
-    let isT=state.compareMode==='template'; S('view-title').innerHTML=`<i class="fa-solid fa-code me-2" style="color:#58a6ff"></i> Diff: ${pN}`; S('diff-html-target').innerHTML='<div class="p-5 text-center text-primary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i></div>';
+    let isT=state.compareMode==='template'; S('view-title').innerHTML=`<i class="fa-solid fa-code me-2" style="color:${CONFIG.COLORS.INFO}"></i> Diff: ${pN}`; S('diff-html-target').innerHTML='<div class="p-5 text-center text-primary"><i class="fa-solid fa-circle-notch fa-spin fa-2x mb-2"></i></div>';
     let cO=oN?.procContents[pN]||"", cM=tN?.procContents[pN]||"", cS=tN?.coreProcContents[pN]||cM, isC=tN?.customProcs.has(pN)||false;
-    
-    S('btn-debug-toggle').classList.remove('d-none');
-    S('debug-banner').classList.toggle('d-none', !state.debugOpen);
-    S('debug-path-orig').textContent = oN?.file?.path ? "$ADITOHOME/" + oN.file.path : "Nicht vorhanden";
-    S('debug-path-orig').dataset.full = oN?.file?.fullPath || "";
-    S('debug-path-mod').textContent = tN?.file?.path ? "$ADITOHOME/" + tN.file.path : "Nicht vorhanden";
-    S('debug-path-mod').dataset.full = tN?.file?.fullPath || "";
+    S('btn-debug-toggle').classList.remove('d-none'); S('debug-banner').classList.toggle('d-none', !state.debugOpen);
+    S('debug-path-orig').textContent = oN?.file?.path ? "$ADITOHOME/" + oN.file.path : "Nicht vorhanden"; S('debug-path-orig').dataset.full = oN?.file?.fullPath || "";
+    S('debug-path-mod').textContent = tN?.file?.path ? "$ADITOHOME/" + tN.file.path : "Nicht vorhanden"; S('debug-path-mod').dataset.full = tN?.file?.fullPath || "";
     renderDebugMods(tN, pN);
-    
     state.diffViewInfo={origCode:cO,modCode:cM,sourceCode:cS,name:pN,pOrig:oN?.file,pMod:tN?.file,isCustomMod:isC,targetNode:tN};
     S('mode-toggle').classList.toggle('d-none',!(isC&&!isT)); setMode((isC&&!isT)?'custom':'core');
 }
@@ -938,30 +983,19 @@ async function reloadCurrentProcess(){
 async function setDiffMode(m){
     if(!state.diffViewInfo)return; let isT=state.compareMode==='template', lN=isT?(window.projNameTpl||'Template'):(window.projNameOrig||'Original'), rN=(isT?(window.projNameOrig||'Source'):(window.projNameMod||'Modular'))+(isT?"":(m==="custom"?" (Custom)":" (Core)"));
     let c1=state.diffViewInfo.origCode, c2=(m==='custom'&&!isT)?state.diffViewInfo.modCode:(isT?state.diffViewInfo.modCode:state.diffViewInfo.sourceCode);
-    
     if (m === 'custom' && !isT) {
         let modF = state.diffViewInfo.targetNode?.modMap?.[state.diffViewInfo.name];
-        if (modF && modF.size > 0) {
-            let selectedMod = [...modF][0];
-            S('debug-path-mod').textContent = "$ADITOHOME/" + selectedMod.path;
-            S('debug-path-mod').dataset.full = selectedMod.fullPath;
-        } else {
-            S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
-            S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || "";
-        }
-    } else {
-        S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden";
-        S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || "";
-    }
+        if (modF && modF.size > 0) { let selectedMod = [...modF][0]; S('debug-path-mod').textContent = "$ADITOHOME/" + selectedMod.path; S('debug-path-mod').dataset.full = selectedMod.fullPath; } 
+        else { S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden"; S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || ""; }
+    } else { S('debug-path-mod').textContent = state.diffViewInfo.pMod?.path ? "$ADITOHOME/" + state.diffViewInfo.pMod.path : "Nicht vorhanden"; S('debug-path-mod').dataset.full = state.diffViewInfo.pMod?.fullPath || ""; }
 
     if(!c1&&c2){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-plus-circle"></i> Neu in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c2)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     if(c1&&!c2){S('diff-html-target').innerHTML=`<div class="alert alert-danger m-3 flex-shrink-0 bg-dark border-danger text-danger"><i class="fa-solid fa-minus-circle"></i> Entfernt in Target.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     if(normS(c1)===normS(c2)&&c1!==""){S('diff-html-target').innerHTML=`<div class="alert alert-success m-3 flex-shrink-0 bg-dark border-success text-success"><i class="fa-solid fa-check-circle"></i> Code ist identisch.</div><div class="p-3 bg-dark flex-grow-1 overflow-auto" style="min-height:0;"><pre class="m-0"><code class="language-javascript bg-transparent">${esc(c1)}</code></pre></div>`; hljs.highlightElement(S('diff-html-target').querySelector('code'));return;}
     
     if(S('rawDiffToggle')?.checked){
-        const bRP=(t,c,iL)=>`<div class="d-flex flex-column ${iL?'border-end border-secondary':''}" style="flex:1 1 50%; min-width:0; min-height:0;"><div class="bg-dark p-2 text-secondary fw-bold border-bottom flex-shrink-0" style="font-size:11px;">${t}</div><div class="bg-dark flex-grow-1 overflow-auto raw-diff-pane" style="min-height:0;"><div class="d-flex"><div class="text-secondary text-end border-end user-select-none opacity-50" style="padding:1rem .5rem; min-width:45px; font-size:14px; font-family:var(--bs-font-monospace); line-height:1.5; background:#0d1117; position:sticky; left:0; z-index:5;">${Array((c||"").split('\n').length).fill().map((_,i)=>i+1).join('\n')}</div><div style="padding:1rem; width:max-content; min-width:calc(100% - 45px);"><pre class="m-0" style="font-size:14px; line-height:1.5;"><code class="language-javascript bg-transparent p-0">${esc(c)}</code></pre></div></div></div></div>`;
-        S('diff-html-target').innerHTML=`<div class="d-flex flex-row flex-grow-1 w-100" style="min-height:0; overflow:hidden;">${bRP(lN,c1,true)}${bRP(rN,c2,false)}</div>`;
-        S('diff-html-target').querySelectorAll('code').forEach(hljs.highlightElement);
+        const bRP=(t,c,iL)=>`<div class="d-flex flex-column ${iL?'border-end border-secondary':''}" style="flex:1 1 50%; min-width:0; min-height:0;"><div class="bg-dark p-2 text-secondary fw-bold border-bottom flex-shrink-0" style="font-size:11px;">${t}</div><div class="bg-dark flex-grow-1 overflow-auto raw-diff-pane" style="min-height:0;"><div class="d-flex"><div class="text-secondary text-end border-end user-select-none opacity-50" style="padding:1rem .5rem; min-width:45px; font-size:14px; font-family:var(--bs-font-monospace); line-height:1.5; background:${CONFIG.COLORS.BG_DARKER}; position:sticky; left:0; z-index:5;">${Array((c||"").split('\n').length).fill().map((_,i)=>i+1).join('\n')}</div><div style="padding:1rem; width:max-content; min-width:calc(100% - 45px);"><pre class="m-0" style="font-size:14px; line-height:1.5;"><code class="language-javascript bg-transparent p-0">${esc(c)}</code></pre></div></div></div></div>`;
+        S('diff-html-target').innerHTML=`<div class="d-flex flex-row flex-grow-1 w-100" style="min-height:0; overflow:hidden;">${bRP(lN,c1,true)}${bRP(rN,c2,false)}</div>`; S('diff-html-target').querySelectorAll('code').forEach(hljs.highlightElement);
     } else {
         S('diff-html-target').innerHTML=''; new Diff2HtmlUI(S('diff-html-target'), Diff.createTwoFilesPatch(lN,rN,c1||"",c2||"","","",{context:99999}), {drawFileList:false,matching:'words',outputFormat:'side-by-side',colorScheme:'dark'}, hljs).draw();
     }
@@ -979,91 +1013,33 @@ S('resizer').onmousedown=()=>{document.onmousemove=e=>{S('pane1').style.flex=`0 
 
 /* --- CUSTOM STRG+F SEARCH --- */
 let searchData = { matches: [], current: -1, query: "" };
-
-document.addEventListener('keydown', e => {
-    if((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        S('custom-search-bar').classList.remove('d-none');
-        S('custom-search-input').focus();
-    } else if (e.key === 'Escape') {
-        closeSearch();
-    }
-});
-
-function closeSearch() {
-    S('custom-search-bar').classList.add('d-none');
-    S('custom-search-input').value = "";
-    clearHighlight();
-}
-
-function clearHighlight() {
-    document.querySelectorAll('mark.search-highlight').forEach(mark => {
-        let parent = mark.parentNode;
-        if(parent) {
-            parent.replaceChild(document.createTextNode(mark.textContent), mark);
-            parent.normalize();
-        }
-    });
-    searchData.matches = [];
-    searchData.current = -1;
-    S('custom-search-count').textContent = '0/0';
-}
-
+document.addEventListener('keydown', e => { if((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); S('custom-search-bar').classList.remove('d-none'); S('custom-search-input').focus(); } else if (e.key === 'Escape') { closeSearch(); } });
+function closeSearch() { S('custom-search-bar').classList.add('d-none'); S('custom-search-input').value = ""; clearHighlight(); }
+function clearHighlight() { document.querySelectorAll('mark.search-highlight').forEach(mark => { let parent = mark.parentNode; if(parent) { parent.replaceChild(document.createTextNode(mark.textContent), mark); parent.normalize(); } }); searchData.matches = []; searchData.current = -1; S('custom-search-count').textContent = '0/0'; }
 function handleSearch(q) {
-    clearHighlight();
-    if(!q) return;
-    searchData.query = q;
-    let isRegex = q.includes('%');
-    let pattern = isRegex ? q.replace(/%/g, '.*') : q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-    let regex = new RegExp(pattern, 'gi');
-    
-    let target = S('content-view');
-    let textNodes = [];
-    let walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null, false);
-    while(walker.nextNode()) {
-        let p = walker.currentNode.parentNode;
-        if(p && p.nodeName !== 'SCRIPT' && p.nodeName !== 'STYLE' && !p.closest('#custom-search-bar') && !p.closest('.d-none')) {
-            textNodes.push(walker.currentNode);
-        }
-    }
-    
+    clearHighlight(); if(!q) return; searchData.query = q; let isRegex = q.includes('%'), pattern = isRegex ? q.replace(/%/g, '.*') : q.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), regex = new RegExp(pattern, 'gi');
+    let target = S('content-view'), textNodes = [], walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null, false);
+    while(walker.nextNode()) { let p = walker.currentNode.parentNode; if(p && p.nodeName !== 'SCRIPT' && p.nodeName !== 'STYLE' && !p.closest('#custom-search-bar') && !p.closest('.d-none')) { textNodes.push(walker.currentNode); } }
     textNodes.forEach(node => {
-        let text = node.nodeValue;
-        let matches = [...text.matchAll(regex)];
+        let text = node.nodeValue, matches = [...text.matchAll(regex)];
         if(matches.length > 0 && matches[0][0] !== "") {
-            let fragment = document.createDocumentFragment();
-            let lastIdx = 0;
+            let fragment = document.createDocumentFragment(), lastIdx = 0;
             matches.forEach(match => {
                 fragment.appendChild(document.createTextNode(text.substring(lastIdx, match.index)));
-                let mark = document.createElement('mark');
-                mark.className = 'search-highlight bg-warning text-dark rounded-1';
-                mark.textContent = match[0];
-                fragment.appendChild(mark);
-                searchData.matches.push(mark);
-                lastIdx = match.index + match[0].length;
+                let mark = document.createElement('mark'); mark.className = 'search-highlight bg-warning text-dark rounded-1'; mark.textContent = match[0]; fragment.appendChild(mark); searchData.matches.push(mark); lastIdx = match.index + match[0].length;
             });
             fragment.appendChild(document.createTextNode(text.substring(lastIdx)));
             if(node.parentNode) node.parentNode.replaceChild(fragment, node);
         }
     });
-    if(searchData.matches.length > 0) jumpSearch(1);
-    else S('custom-search-count').textContent = '0/0';
+    if(searchData.matches.length > 0) jumpSearch(1); else S('custom-search-count').textContent = '0/0';
 }
-
 function jumpSearch(dir) {
     if(searchData.matches.length === 0) return;
     searchData.matches.forEach(m => { m.classList.remove('bg-info', 'text-white'); m.classList.add('bg-warning', 'text-dark'); });
-    
-    searchData.current += dir;
-    if(searchData.current >= searchData.matches.length) searchData.current = 0;
-    if(searchData.current < 0) searchData.current = searchData.matches.length - 1;
-    
-    let currentMark = searchData.matches[searchData.current];
-    currentMark.classList.remove('bg-warning', 'text-dark');
-    currentMark.classList.add('bg-info', 'text-white');
-    
-    currentMark.scrollIntoView({behavior: 'auto', block: 'center'});
-    S('custom-search-count').textContent = `${searchData.current + 1}/${searchData.matches.length}`;
+    searchData.current += dir; if(searchData.current >= searchData.matches.length) searchData.current = 0; if(searchData.current < 0) searchData.current = searchData.matches.length - 1;
+    let currentMark = searchData.matches[searchData.current]; currentMark.classList.remove('bg-warning', 'text-dark'); currentMark.classList.add('bg-info', 'text-white');
+    currentMark.scrollIntoView({behavior: 'auto', block: 'center'}); S('custom-search-count').textContent = `${searchData.current + 1}/${searchData.matches.length}`;
 }
 </script>
 </body>
